@@ -53,6 +53,9 @@ class Fasta:
 	def __hash__(self):
 		return hash( self.name + self.seq )
 
+	def __str__(self):
+		return self.seq
+
 	def subseq(self,start,end):
 		l = len(self.seq)
 		if start < 1 or start >= l or end < 1 or end > l:
@@ -116,7 +119,7 @@ class Fasta:
 		if not self.type in self.nttypes: return
 		#self.seq = translate_simple(self.seq)
 		translations = translate(self.seq)
-		self.seq = string.join(translations[frame], '')
+		self.seq = ''.join(translations[frame])
 		self.type = 'protein'
 
 	def summarize(self):
@@ -169,7 +172,7 @@ class SeqWindows(dict):
 			if   strand in self.fwd: antisense = False
 			elif strand in self.rvs: antisense = True
 			else: sys.stderr.write('%s\n%s\nUNKNOWN DIRECTION ASSUMING fwd\n' %(l,flds))
-			if not self.has_key(source): self[source]=[]
+			if not source in self: self[source]=[]
 			self[source].append( SeqWindow( name, int(start), int(end), antisense ))
 
 class FastaSeqs:
@@ -213,7 +216,7 @@ class FastaSeqs:
 	def loadseqs(self,files):
 		for file in files:
 			if not file or not os.path.exists(file):
-				print 'skipping invalid sequence file %s' %file
+				print('skipping invalid sequence file %s' %file)
 				continue
 			seqname=''
 			seq=[]
@@ -221,9 +224,9 @@ class FastaSeqs:
 			for line in open(file):
 				if line.startswith('>'):
 					if seqname != '' and len(seq)>0:
-						if self.seqs.has_key(seqname):
+						if seqname in self.seqs:
 							sys.stderr.write('warning: replacing exisiting seq with same name %s\n' %seqname)
-						self.seqs[seqname] = Fasta( string.join(seq,''), seqname )
+						self.seqs[seqname] = Fasta( ''.join(seq), seqname )
 						self.order.append(seqname)
 						seq=[]
 					seqname=re.sub('>','',line.strip()).strip()
@@ -231,9 +234,9 @@ class FastaSeqs:
 					seq.append( line.strip() )
 			# last hanging seq
 			if seqname != '' and len(seq)>0:
-				if self.seqs.has_key(seqname):
+				if seqname in self.seqs:
 					sys.stderr.write('warning: replacing exisiting seq with same name %s\n' %seqname)
-				self.seqs[seqname] = Fasta( string.join(seq,''), seqname )
+				self.seqs[seqname] = Fasta( ''.join(seq), seqname )
 				self.order.append(seqname)
 
 	def process(self,opt):
@@ -309,12 +312,14 @@ class FastaSeqs:
 		for seq in self.seqs.values(): seq.removegaps()
 
 	def rawseqs(self):
-		return string.join( [self.seqs[key].seq for key in self.order],' ')
+		return ' '.join( [self.seqs[key].seq for key in self.order])
 
 	def subseqs(self,windows):
 		subseqs = FastaSeqs()
 		for seq,windows in windows.items():
-			if not self.seqs.has_key(seq): print 'no seq %s loaded' %seq; continue
+			if not seq in self.seqs:
+				print('no seq %s loaded' %seq)
+				continue
 			for window in windows:
 				subseq = self.seqs[seq].subseq(window.start,window.end)
 				subseq.name = window.name
@@ -327,7 +332,9 @@ class FastaSeqs:
 		sys.stderr.write('promoter sequences with windows %i to %i\n' %(promoter_start,promoter_end))
 		promseqs = FastaSeqs()
 		for seq,windows in windows.items():
-			if not self.seqs.has_key(seq): print 'no seq %s loaded' %seq; continue
+			if not seq in self.seqs:
+				print('no seq %s loaded' %seq)
+				continue
 			for window in windows:
 				promseq = self.seqs[seq].promseq(window.start,window.end,window.antisense,promoter_start,promoter_end)
 				promseq.name = window.name
@@ -340,9 +347,9 @@ class FastaSeqs:
 			seq = self.seqs[key]
 			fname='%s.fa'%seq.shortname()
 			if os.path.exists(fname):
-				if overwrite: print 'overwriting file %s' %fname
+				if overwrite: print('overwriting file %s' %fname)
 				else:
-					print '%s exists, skipping' %fname
+					print('%s exists, skipping' %fname)
 					continue
 			f=open(fname,'w')
 			f.write('%s\n' %seq.fasta())
@@ -362,14 +369,14 @@ class FastaSeqs:
 		for key in self.order:
 			seq = self.seqs[key]
 			out.append( seq.csv() )
-		return string.join( out, '\n' )
+		return '\n'.join( out)
 
 	def __str__(self):
 		out = []
 		for key in self.order:
 			seq = self.seqs[key]
 			out.append( seq.fasta() )
-		return string.join( out, '\n' )
+		return '\n'.join( out)
 
 	# Schneider/Stormo/(Shannon) information content
 	def infocontent(self):
@@ -382,10 +389,10 @@ class FastaSeqs:
 		for seq in self.seqs.values():
 			rawseqs.append(seq.seq)
 		values = ic.run(rawseqs)
-		return string.join(['%.3f'%v for v in values],'\n')
+		return '\n'.join(['%.3f'%v for v in values])
 
 	def summarize(self):
-		return string.join([ self.seqs[key].summarize() for key in self.order], '\n' )
+		return '\n'.join([ self.seqs[key].summarize() for key in self.order])
 
 	def named_list(self):
 		seqs = []
@@ -407,4 +414,4 @@ if __name__ == "__main__":
 	opt,args=op.parse_args()
 
 	app=FastaSeqs()
-	print app.go(opt,args)
+	print(app.go(opt,args))

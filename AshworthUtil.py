@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 __author__ = "Justin Ashworth"
 
-import commands, re, sys, string, os
+import re, sys, string, os, subprocess
 from math import sqrt
 
 # old python versions do not have the 'sorted' built-in
@@ -62,11 +62,13 @@ re_numbers = re.compile('[0-9]')
 
 aa1 = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
 if not len(aa1) == 20:
-	print 'error!'; sys.exit
+	print('error!')
+	sys.exit
 
 aa3 = ['ALA','CYS','ASP','GLU','PHE','GLY','HIS','ILE','LYS','LEU','MET','ASN','PRO','GLN','ARG','SER','THR','VAL','TRP','TYR']
 if not len(aa3) == 20:
-	print 'error!'; sys.exit
+	print('error!')
+	sys.exit
 amino_acids = aa3
 
 oneletter = {'ALA':'A','CYS':'C','ASP':'D','GLU':'E','PHE':'F','GLY':'G',
@@ -115,14 +117,26 @@ comp = {
 	'c':'g',
 	'g':'c',
 	't':'a',
+  'R':'Y',
+  'Y':'R',
+  'S':'W',
+  'W':'S',
+  'K':'M',
+  'M':'K',
+  'B':'V',
+  'D':'H',
+  'H':'D',
+  'V':'B',
 #	'n':'n', # use compbase if other characters are expected
 #	'N':'N',
 }
 
-# safer
+# failed lookups are warnings not errors
 def compbase(char):
 	try: return comp[char]
-	except: return char
+	except:
+		print('failed to complement base %s' %char)
+		return char
 
 # redundant with oneletter?
 dnares = {
@@ -188,7 +202,7 @@ def pdb_to_seq(filename,template=None):
 	else: pdb = file(filename,'r')
 
 	if template and os.path.exists(template):
-		print 'template file %s' %template
+		print('template file %s' %template)
 		chains = pdb_to_seq(template) # semi-recursive
 
 	for line in pdb:
@@ -210,7 +224,7 @@ def pdb_to_seq(filename,template=None):
 			letter = 'X'
 			try: letter = oneletter[resn]
 			except: pass
-#			print line,chain,resi,letter
+#			print(line,chain,resi,letter)
 			chains['dna'][chain].add( ChainPos(chain,resi), Residue(letter) )
 	return chains
 
@@ -271,7 +285,7 @@ def rosetta_filename(filename):
 		if ids.has_key(id): prefix.append( str(ids[id]) )
 
 	prefix = string.join( prefix, '_' )
-#	print prefix, ids
+#	print(prefix, ids)
 	return prefix, ids
 
 def rosetta_filenames_sort(a,b):
@@ -348,7 +362,7 @@ nucs = ['a','c','g','t','n']
 def lead_zero_string( length, number ):
 	string = str(number)
 	if len(string) > length:
-		print 'number greater than length!'
+		print('number greater than length!')
 		sys.exit()
 	while len(string) < length:
 		string = '0' + string
@@ -403,7 +417,7 @@ def permute_positions( index, seedseq, seq, seqs ):
 	# seedseq: input sequence withs positions to permute
   # seq: current sequence being built
 	# container for adding new sequences to
-#	print index # debug
+#	print(index # debug)
 	if seq == []:
 		for i in range(len(seedseq)): seq.append( Position() )
 	if permute_me( seedseq[index] ):
@@ -412,13 +426,13 @@ def permute_positions( index, seedseq, seq, seqs ):
 			seq[index].type = threeletter[base]
 			if index >= len(seedseq) - 1:
 				seqs.append( [ Position( P.chain, P.index, P.type ) for P in seq ] ) # hard copy
-#				print [ str(P) for P in seqs[-1] ] # debug
+#				print([ str(P) for P in seqs[-1] ] # debug)
 			else: permute_positions( index+1, seedseq, seq, seqs )
 	else:
 		seq[index] = Position( seedseq[index].chain, seedseq[index].index, seedseq[index].type )
 		if index >= len(seedseq) - 1:
 			seqs.append( [ Position( P.chain, P.index, P.type ) for P in seq ] ) # hard copy
-#			print [ str(P) for P in seqs[-1] ] # debug
+#			print([ str(P) for P in seqs[-1] ] # debug)
 		else: permute_positions( index+1, seedseq, seq, seqs )
 
 # think of a way around this code duplication?
@@ -432,13 +446,13 @@ def permute_positions_excluding_relatives_of( relseq, index, seedseq, seq, seqs 
 			seq[index].type = threeletter[base]
 			if index >= len(seedseq) - 1:
 				seqs.append( [ Position( P.chain, P.index, P.type ) for P in seq ] ) # hard copy
-#				print [ str(P) for P in seqs[-1] ] # debug
+#				print([ str(P) for P in seqs[-1] ] # debug)
 			else: permute_positions_excluding_relatives_of( relseq, index+1, seedseq, seq, seqs )
 	else:
 		seq[index] = Position( seedseq[index].chain, seedseq[index].index, seedseq[index].type )
 		if index >= len(seedseq) - 1:
 			seqs.append( [ Position( P.chain, P.index, P.type ) for P in seq ] ) # hard copy
-#			print [ str(P) for P in seqs[-1] ] # debug
+#			print([ str(P) for P in seqs[-1] ] # debug)
 		else: permute_positions_excluding_relatives_of( relseq, index+1, seedseq, seq, seqs )
 
 def permute_me(P):
@@ -475,13 +489,12 @@ class Residue:
 #		exclude hydrogens and backbone atoms
 		if skip_atom(atom): return
 		x = line[30:38].strip(); y = line[38:46].strip(); z = line[46:54].strip()
-#		print atom, x, y, z
+#		print(atom, x, y, z)
 		self.coord[atom] = ( float(x), float(y), float(z) )
 #		self.print_atom(atom)
 
 	def print_atom(self,atom):
-		print '%3s %4s %7.3f %7.3f %7.3f' % ( self.type, atom, self.coord[atom][0],
-		                                  self.coord[atom][1], self.coord[atom][2] )
+		print('%3s %4s %7.3f %7.3f %7.3f' % ( self.type, atom, self.coord[atom][0], self.coord[atom][1], self.coord[atom][2] ))
 
 class Chain:
 	def __init__(self):
@@ -490,13 +503,13 @@ class Chain:
 	def add(self,chainpos,residue=Residue()):
 		if self.id == '-': self.id = chainpos.chain
 		elif chainpos.chain != self.id:
-			print 'error, attempting to combine chains!'
+			print('error, attempting to combine chains!')
 		self.residues[chainpos] = residue
 	def res(self,chainpos):
 		if self.residues.has_key(chainpos):
 			return self.residues[chainpos]
 		else:
-			print 'error: no %s in chain!' %chainpos
+			print('error: no %s in chain!' %chainpos)
 			return None
 	def seq(self):
 		seq = []
@@ -551,7 +564,7 @@ def dist3D( xyz1, xyz2 ):
 def residue_rmsd(res1,res2):
 	l1 = len(res1.coord)
 	if len(res2.coord) != l1:
-		print 'Warning, rmsd calculation for residues of different length!'
+		print('Warning, rmsd calculation for residues of different length!')
 	if l1 == 0: return 0
 	sum = 0.0
 	for atom in res1.coord:
@@ -564,7 +577,8 @@ def residue_rmsd(res1,res2):
 
 def make_resfile( pdb, resname = '', restag = 'AUTOM' ):
 	if not os.path.exists(pdb):
-		print '%s not found' %pdb; return
+		print('%s not found' %pdb)
+		return
 	root = pdb.split('.')[0]
 	if resname == '': resname = '%s.res' %root
 	resfile = open( resname, 'w' )
@@ -585,7 +599,8 @@ def make_resfile( pdb, resname = '', restag = 'AUTOM' ):
 
 def make_resfile_new( pdb, resname = '', global_defaults = ['AUTO'], default = '' ):
 	if not os.path.exists(pdb):
-		print '%s not found' %pdb; return
+		print('%s not found' %pdb)
+		return
 	root = pdb.split('.')[0]
 	if resname == '': resname = '%s.resfile' %root
 	resfile = open( resname, 'w' )
@@ -628,7 +643,7 @@ def chi_deltas_same( a, b ):
 	return True
 
 def zgrep( string, path ):
-	return commands.getoutput( "zgrep %s %s" % ( string, path ) )
+	return subprocess.getoutput( "zgrep %s %s" % ( string, path ) )
 
 def compseq(seq):
 	return string.join( [ compbase(base) for base in seq ], '' )
@@ -709,4 +724,4 @@ def mean_sd( list ):
 	return mean, sqrt(sd/(l-1))
 
 if __name__ == "__main__":
-	print 'Python library--no standalone implementation'
+	print('Python library--no standalone implementation')
