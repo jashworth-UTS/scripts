@@ -287,7 +287,7 @@ class DNAMotif:
 		out.append( 'ALPHABET= %s\n' %(''.join(self.bases)) )
 		out.append( 'strands: + -\n' )
 		out.append( 'Background letter frequencies (from' )
-		out.append( ''.join( [ '%s %f' %(base,self.bg[base]) for base in self.bases ] ) )
+		out.append( ' '.join( [ '%s %f' %(base,self.bg[base]) for base in self.bases ] ) )
 		return '\n'.join(out) + '\n'
 
 	def output_MEME(self,name=None,logodds=False):
