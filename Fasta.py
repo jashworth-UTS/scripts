@@ -91,8 +91,8 @@ class Fasta:
 			self.type = self.nttypes[0]
 		elif self.re_allprotein.match(self.seq[:l]):
 			self.type = self.prottypes[0]
-		else:
-			sys.stderr.write('failed to guess type for %s\n' %self.name)
+#		else:
+#			sys.stderr.write('failed to guess type for %s\n' %self.name)
 
 	def clean(self):
 		self.seq = re.sub('[0-9 \t]','',self.seq)
