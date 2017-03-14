@@ -127,8 +127,7 @@ comp = {
   'D':'H',
   'H':'D',
   'V':'B',
-#	'n':'n', # use compbase if other characters are expected
-#	'N':'N',
+	'N':'N',
 }
 
 # failed lookups are warnings not errors

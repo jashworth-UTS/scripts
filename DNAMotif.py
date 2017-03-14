@@ -120,7 +120,7 @@ class DNAMotif:
 			for b in range(len(self.bases)):
 				self.matrix[type][i][self.bases[b]]=float(vals[b])
 		self.normalize_probs()
-		print('read motif: %s' %self.consensus())
+		sys.stderr.write('read motif: %s\n' %self.consensus())
 
 	def load_motif_file(self,fname):
 		if not os.path.exists(fname): raise IOError('file %s not found' %fname)
@@ -316,8 +316,8 @@ class DNAMotif:
 
 	def output_MEME_probs(self):
 		out = []
-#		if self.matrix['probs']==[]: self.make_probs_matrix()
-		self.make_probs_matrix()
+		if self.matrix['probs']==[]: self.make_probs_matrix()
+#		self.make_probs_matrix()
 		alength = len(self.bases)
 		out.append( 'letter-probability matrix: alength= %i w= %i nsites= 1 E= 0 ' %(alength,self.width) )
 		for i in range(self.width):
@@ -400,6 +400,8 @@ class DNAMotifs:
 		if opt.bg:
 			if not os.path.exists(opt.bg): RuntimeError('bg file not found')
 			bg=DNAMotif().read_bgfile(opt.bg)
+		if opt.MEME:
+			self.motifs = readMEME(args[0])
 		if opt.multi:
 			dnaseqs = FastaSeqs()
 			dnaseqs.loadseqs([opt.multi])
@@ -407,7 +409,6 @@ class DNAMotifs:
 				motif = DNAMotif(len(seq),seq.name,pseudocounts=opt.pseudocounts,data_type='counts',bg=bg)
 				motif.make_counts_matrix( [seq] )
 				self.motifs.append(motif)
-
 		if opt.motif_file:
 			motif = DNAMotif()
 			if opt.bg:
@@ -415,7 +416,7 @@ class DNAMotifs:
 				motif.read_bgfile(opt.bg)
 			motif.load_motif_file(opt.motif_file)
 			self.motifs.append(motif)
-		else: self.load_fasta_files(args,opt)
+		if opt.fasta: self.load_fasta_files(args,opt)
 
 	def load_fasta_files(self,files,opt=None):
 		if opt: self.opt = opt
@@ -480,7 +481,7 @@ def readMEME_from_lines(lines,Eval_cutoff=1e100):
 		namematch = re_name.search(line)
 		if namematch:
 			name = namematch.groups()[0]
-			print('reading MOTIF %s' %name)
+			sys.stderr.write('reading MOTIF %s\n' %name)
 		if line.startswith('letter-probability matrix'):
 			Eval = re_eval.search(line)
 			if Eval: Eval = float( Eval.groups()[0] )
@@ -513,6 +514,7 @@ if __name__ == "__main__":
 	p.add_option('--bg',help='background base frequencies')
 	p.add_option('--end',type='int',default=0,help='motif endpoint in sequence')
 	p.add_option('--MEME',action='store_true')
+	p.add_option('-f','--fasta')
 	p.add_option('-m','--motif_file')
 	p.add_option('--multi',help='Fasta input for multiple independent motif outut')
 	p.add_option('-p','--probs',action='store_true')
@@ -523,7 +525,7 @@ if __name__ == "__main__":
 	opt,args=p.parse_args()
 	app = DNAMotifs()
 	app.run(opt,args)
-	if opt.MEME: print(app.output('MEME'))
-	elif opt.probs: print(app.output('probs'))
+	if opt.probs: print(app.output('probs'))
+	elif opt.MEME: print(app.output('MEME'))
 	elif opt.TRANSFAC: print(app.output('TRANSFAC'))
 	else: print(app.output())

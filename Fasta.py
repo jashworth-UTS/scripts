@@ -66,7 +66,7 @@ class Fasta:
 			if end > l: end = l
 		return Fasta( self.seq[start-1:end], '%s_%i-%i' %(self.name,start,end) )
 
-	def promseq(self,start,end,antisense,upstream=-350,downstream=150):
+	def promseq(self,start,end,antisense,upstream=-350,downstream=50):
 		l = len(self.seq)
 		promstart = start + upstream
 		promend = start + downstream
@@ -151,7 +151,7 @@ class SeqWindow:
 class SeqWindows(dict):
 	# file format expected:
 	#five fields, tab/space-delimted: name source_seq start end strand
-	#THAPSDRAFT_111 chr_1 400 799 +
+	#THAPSDRAFT_111 chr_1 + 400 799
 	fwd = ['+','fwd','D']
 	rvs = ['-','rvs','R']
 	def __init__(self):
