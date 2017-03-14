@@ -180,6 +180,7 @@ class FastaSeqs:
 	op.add_option('-i','--infocontent',action='store_true')
 	op.add_option('-g','--nogaps',action='store_true')
 	op.add_option('--filter',help='regex filter for sequence names')
+	op.add_option('--id',help='specific id to consider')
 	op.add_option('--ids',help='file containing list (single column) of specific ids to consider')
 	op.add_option('-O','--overwrite',action='store_true')
 	op.add_option('-r','--raw',help='just output space-delimited raw sequences',action='store_true')
@@ -256,6 +257,7 @@ class FastaSeqs:
 			self.order = subseqs.order
 		if opt.translate: self.translate(opt.frame)
 		if opt.filter: self.filter(opt)
+		if opt.id: self.this_id(opt.id)
 		if opt.ids: self.these_ids(opt.ids)
 		if opt.unique: self.unique()
 		if opt.rvscomp: self.rvscomp()
@@ -277,6 +279,12 @@ class FastaSeqs:
 			sys.stderr.write('oops, no seq names passed filter %s!\n' %opt.filter)
 		self.seqs = filteredseqs
 		self.order = neworder
+
+	def this_id(self,id):
+		this_seq = {}
+		this_seq[id] = self.seqs[id]
+		self.seqs = this_seq
+		self.order = [id]
 
 	def these_ids(self,ids_file):
 		if not os.path.exists(ids_file):
