@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -M justin.ashworth@uts.edu.au
+#PBS -m n
+#PBS -N blastp
+#PBS -o blastp.log
+#PBS -e blastp.err
+#PBS -S /bin/bash
+#PBS -l walltime=200:00:00
+#PBS -l ncpus=1
+#PBS -l mem=2000MB
+
+cd $PBS_O_WORKDIR
+
+pair=( `head -n $PBS_ARRAY_INDEX $pairs | tail -n 1` )
+#echo "pair ${pair[*]}" >> debug
+q=${pair[0]}
+db=${pair[1]}
+#echo "q $q db $db" >> debug
+outf=`basename $q .aa.ids.fa`.vs.`basename $db .aa.ids.fa`
+
+blastp -query $q -db $db -outfmt 6 -evalue 1e-10 > $outf
+./best_blast.py $outf > $outf.best

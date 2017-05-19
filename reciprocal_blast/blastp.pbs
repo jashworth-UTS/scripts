@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -M justin.ashworth@uts.edu.au
+#PBS -m n
+#PBS -N blastp
+#PBS -o blastp.log
+#PBS -e blastp.err
+#PBS -S /bin/bash
+#PBS -l walltime=200:00:00
+#PBS -l ncpus=1
+#PBS -l mem=2000MB
+
+cd $PBS_O_WORKDIR
+
+blastp -query $q -db $db -outfmt 6 -evalue 1e-10 > $q.vs.$db

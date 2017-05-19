@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -M justin.ashworth@uts.edu.au
+#PBS -m n
+#PBS -N best
+#PBS -o best.out
+#PBS -e best.err
+#PBS -S /bin/bash
+#PBS -l walltime=200:00:00
+#PBS -l ncpus=1
+#PBS -l mem=2000MB
+
+cd $PBS_O_WORKDIR
+
+./best_blast.py $f > $f.best
