@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 __author__ = "Justin Ashworth"
 
-import re, sys, string, os, subprocess
+import re, sys, os, subprocess
 from math import sqrt
 
 # old python versions do not have the 'sorted' built-in
@@ -283,7 +283,7 @@ def rosetta_filename(filename):
 #	for id in ['pdb','pos','seq','queueindex']:
 		if ids.has_key(id): prefix.append( str(ids[id]) )
 
-	prefix = string.join( prefix, '_' )
+	prefix = '_'.join( prefix)
 #	print(prefix, ids)
 	return prefix, ids
 
@@ -354,7 +354,7 @@ def next_seq( seq ):
 		if change == 1: next[i] = next_rosetta_base[seq[i]]
 		if seq[i] != 't': change = 0
 		i -= 1
-	return string.join(next,'')
+	return ''.join(next)
 
 nucs = ['a','c','g','t','n']
 
@@ -382,7 +382,7 @@ def all_combinations( pos, length, seq, seqs ):
 	for base in bases:
 		seq[pos] = base
 		if pos == length-1:
-			seqs.append( string.join( seq, '' ) )
+			seqs.append( ''.join( seq ) )
 		else: all_combinations( pos+1, length, seq, seqs )
 
 def all_combinations_gen( pos, length, seq, seqs, choices ):
@@ -391,7 +391,7 @@ def all_combinations_gen( pos, length, seq, seqs, choices ):
 	for choice in choices[pos]:
 		seq[pos] = choice
 		if pos == length-1:
-			seqs.append( string.join( seq, '' ) )
+			seqs.append( ''.join( seq ) )
 		else: all_combinations_gen( pos+1, length, seq, seqs, choices )
 
 def all_combinations_without( pos, length, seq, seqs, nativeseq ):
@@ -401,7 +401,7 @@ def all_combinations_without( pos, length, seq, seqs, nativeseq ):
 		if base == nativeseq[pos]: continue
 		seq[pos] = base
 		if pos == length-1:
-			seqs.append( string.join( seq, '' ) )
+			seqs.append( ''.join( seq ) )
 		else: all_combinations_without( pos+1, length, seq, seqs, nativeseq )
 
 def only_combos_with( base, ipos, seqs ):
@@ -468,7 +468,7 @@ def SNPs(codon):
 			# list workaround for 'immutable string' silliness
 			SNP = [n for n in codon]
 			SNP[i] = base
-			SNP = string.join(SNP,'')
+			SNP = ''.join(SNP)
 			SNPs.append(SNP)
 	return SNPs
 
@@ -514,12 +514,12 @@ class Chain:
 		seq = []
 		for cp in sorted(self.residues):
 			seq.append( self.residues[cp].type )
-		return string.join( seq, '' )
+		return ''.join( seq )
 	def strdefs(self):
 		out = []
 		for cp in sorted(self.residues):
 			out.append( '%s.%i.%s' %(cp.chain, cp.pos, self.residues[cp]) )
-		return string.join(out, '\n') + '\n'
+		return '\n'.join(out) + '\n'
 	def __str__(self):
 		out = 'Chain %s: %s to %s\n' %(self.id, self.start(), self.end())
 		return out + self.seq()
@@ -604,7 +604,7 @@ def make_resfile_new( pdb, resname = '', global_defaults = ['AUTO'], default = '
 	if resname == '': resname = '%s.resfile' %root
 	resfile = open( resname, 'w' )
 	resfile.write('# generated from %s\n' %pdb )
-	resfile.write( '%s\n' % string.join( global_defaults, ' ' ) )
+	resfile.write( '%s\n' % ' '.join( global_defaults ) )
 	resfile.write('start\n')
 	resj = 0; lastres = -1
 	for line in open(pdb,'r'):
@@ -625,7 +625,7 @@ def children( files, prefix ):
 	return sorted( [ path for path in files if path[:len(prefix)+1] == prefix+'_' ] )
 
 def get_prefix( path, num_keys ):
-	return string.join( path.split('_')[:num_keys], '_' )
+	return '_'.join( path.split('_')[:num_keys] )
 
 def chi_deltas_same( a, b ):
 	# compares list of tuples with indices 0 : resid, 1-4 : chi deltas
@@ -645,10 +645,10 @@ def zgrep( string, path ):
 	return subprocess.getoutput( "zgrep %s %s" % ( string, path ) )
 
 def compseq(seq):
-	return string.join( [ compbase(base) for base in seq ], '' )
+	return ''.join( [ compbase(base) for base in seq ])
 
 def rvs_comp_str(seq):
-	return string.join([ compbase(base) for base in reversed(seq) ], '' )
+	return(''.join([ compbase(base) for base in reversed(seq) ]))
 
 def rvs_comp(seq):
 	return [ compbase(base) for base in reversed(seq) ]
@@ -658,7 +658,7 @@ def translate_simple(seq):
 	re_codon = re.compile('([acgtnACGTN]{3})')
 	for m in re_codon.finditer(seq):
 		pseq.append( translate_codon( m.groups()[0] ) )
-	return string.join(pseq,'')
+	return ''.join(pseq)
 
 def translate(seq):
 	re_codon = re.compile( '[a-zA-Z]{3}' )
@@ -679,7 +679,7 @@ def dec2hex( dec ):
 	hex.extend( ['a','b','c','d','e','f'] )
 	places = []
 	baserecurse( dec, places, 16 )
-	return string.join( [ hex[place] for place in reversed(places) ], '' )
+	return ''.join( [ hex[place] for place in reversed(places) ] )
 
 # should work for any base 'n'
 def baserecurse( dec, places, base ):

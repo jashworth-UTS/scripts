@@ -316,8 +316,9 @@ class DNAMotif:
 
 	def output_MEME_probs(self):
 		out = []
-		if self.matrix['probs']==[]: self.make_probs_matrix()
-#		self.make_probs_matrix()
+#		if self.matrix['probs']==[]: self.make_probs_matrix()
+#		print self.matrix['probs']
+		self.make_probs_matrix()
 		alength = len(self.bases)
 		out.append( 'letter-probability matrix: alength= %i w= %i nsites= 1 E= 0 ' %(alength,self.width) )
 		for i in range(self.width):
@@ -400,23 +401,24 @@ class DNAMotifs:
 		if opt.bg:
 			if not os.path.exists(opt.bg): RuntimeError('bg file not found')
 			bg=DNAMotif().read_bgfile(opt.bg)
-		if opt.MEME:
+		if opt.intype == 'fasta':
+			if opt.in_multi:
+				dnaseqs = FastaSeqs()
+				dnaseqs.loadseqs([opt.in_multi])
+				for seq in dnaseqs.seqs.values():
+					motif = DNAMotif(len(seq),seq.name,pseudocounts=opt.pseudocounts,data_type='counts',bg=bg)
+					motif.make_counts_matrix( [seq] )
+					self.motifs.append(motif)
+			else: self.load_fasta_files(args,opt)
+		elif self.opt.intype == 'MEME':
 			self.motifs = readMEME(args[0])
-		if opt.multi:
-			dnaseqs = FastaSeqs()
-			dnaseqs.loadseqs([opt.multi])
-			for seq in dnaseqs.seqs.values():
-				motif = DNAMotif(len(seq),seq.name,pseudocounts=opt.pseudocounts,data_type='counts',bg=bg)
-				motif.make_counts_matrix( [seq] )
-				self.motifs.append(motif)
-		if opt.motif_file:
+		else:
 			motif = DNAMotif()
 			if opt.bg:
 				if not os.path.exists(opt.bg): RuntimeError('bg file not found')
 				motif.read_bgfile(opt.bg)
-			motif.load_motif_file(opt.motif_file)
+			motif.load_motif_file(args[0])
 			self.motifs.append(motif)
-		if opt.fasta: self.load_fasta_files(args,opt)
 
 	def load_fasta_files(self,files,opt=None):
 		if opt: self.opt = opt
@@ -454,21 +456,32 @@ class DNAMotifs:
 			out.append(str(m))
 		return '\n'.join(out) + '\n'
 
-	def output(self,type='counts'):
-		out = []
-		if type == 'MEME': out.append(self.motifs[0].output_MEME_header())
+	def output(self):
+
+		type = self.opt.outtype
+
+		outlines = []
+		MEMEheader = self.motifs[0].output_MEME_header()
+		if type == 'MEME': outlines.append(MEMEheader)
+
 		for m in self.motifs:
-			name = m.name
-			if opt.outprefix: name = opt.outprefix
-			out.append(m.output(type=type,name=name))
-		out = '\n'.join(out) + '\n'
+			m_out = m.output(type=type)
+			if self.opt.sepfiles:
+				f = open('%s.%s' %(m.name,type),'w')
+				if type == 'MEME': f.write('%s\n' %MEMEheader)
+				f.write(m_out)
+				f.close()
+			else: outlines.append(m_out)
+
+		outlines = '\n'.join(outlines) + '\n'
+
 		if self.opt.outprefix:
-			fname = '%s.%s' %(opt.outprefix,type)
+			fname = '%s.%s' %(self.opt.outprefix,type)
 			f=open(fname,'w')
-			f.write(out)
+			f.write(outlines)
 			f.close()
-			return 'output %s motif to %s' %(type,fname)
-		else: return out
+			print('output %s motif to %s\n' %(type,fname))
+		else: print(outlines)
 
 def readMEME_from_lines(lines,Eval_cutoff=1e100):
 	mots = []
@@ -513,19 +526,16 @@ if __name__ == "__main__":
 	p=OptionParser()
 	p.add_option('--bg',help='background base frequencies')
 	p.add_option('--end',type='int',default=0,help='motif endpoint in sequence')
-	p.add_option('--MEME',action='store_true')
 	p.add_option('-f','--fasta')
 	p.add_option('-m','--motif_file')
-	p.add_option('--multi',help='Fasta input for multiple independent motif outut')
-	p.add_option('-p','--probs',action='store_true')
-	p.add_option('-o','--outprefix')
+	p.add_option('--in_multi',help='Fasta input for multiple independent motif outut')
+	p.add_option('--sepfiles',action='store_true',help='output separate files for each motif (use with --multi)')
+	p.add_option('--outprefix')
 	p.add_option('--pseudocounts',type='int',default='0')
 	p.add_option('--start',type='int',default=0,help='motif starting point in sequence')
-	p.add_option('-t','--TRANSFAC',action='store_true')
+	p.add_option('-i','--intype',help='input type',default='MEME')
+	p.add_option('-o','--outtype',help='output type',default='counts')
 	opt,args=p.parse_args()
 	app = DNAMotifs()
 	app.run(opt,args)
-	if opt.probs: print(app.output('probs'))
-	elif opt.MEME: print(app.output('MEME'))
-	elif opt.TRANSFAC: print(app.output('TRANSFAC'))
-	else: print(app.output())
+	app.output()
