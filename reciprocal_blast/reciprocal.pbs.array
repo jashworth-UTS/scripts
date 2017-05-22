@@ -1,0 +1,25 @@
+#!/bin/bash
+#PBS -M justin.ashworth@uts.edu.au
+#PBS -m n
+#PBS -N reciprocal
+#PBS -o reciprocal.log
+#PBS -e reciprocal.err
+#PBS -S /bin/bash
+#PBS -l walltime=200:00:00
+#PBS -l ncpus=1
+#PBS -l mem=2000MB
+
+cd $PBS_O_WORKDIR
+
+pair=( `head -n $PBS_ARRAY_INDEX $pairs | tail -n 1` )
+a=${pair[0]}
+b=${pair[1]}
+
+#echo "$a $b"
+
+a_vs_b=$a.vs.$b.best
+b_vs_a=$b.vs.$a.best
+
+#echo "$a_vs_b $b_vs_$a"
+
+./reciprocal.py $a_vs_b $b_vs_a > $a.$b.reciprocal
