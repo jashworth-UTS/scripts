@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-class Homolog:
+class Model:
 	def __init__(self,org,id):
 		self.org = org
 		self.id = id
@@ -34,12 +34,13 @@ def make_dict(fs):
 			ga = s[0]
 			gb = s[1]
 			if not ga in orgs[a]: orgs[a][ga] = {}
-			orgs[a][ga][b] = Homolog(b,gb)
+			orgs[a][ga][b] = Model(b,gb)
 			if not gb in orgs[b]: orgs[b][gb] = {}
-			orgs[b][gb][a] = Homolog(a,ga)
+			orgs[b][gb][a] = Model(a,ga)
 
 	print('orgs: %s' %(' '.join(orgs.keys())))
 	return(orgs)
 
 #def make_tables(orgs):
 	# to do: make org-centric tables in pandas format for usage and writing to file
+	# or add to sqlite3
