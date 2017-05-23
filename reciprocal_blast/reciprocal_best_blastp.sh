@@ -19,4 +19,4 @@ blastp_best=$(qsub -q $queue -J $j1 -v pairs=pairs blastp_best.pbs.array)
 
 
 # now figure out unique pairs and process reciprocally as such
-qsub -W depend=afterok:$blastp_best -q $queue -J $j2 -v pairs=unique_pairs reciprocal.pbs
+qsub -W depend=afterok:$blastp_best -q $queue -J $j2 -v pairs=unique_pairs reciprocal.pbs.array

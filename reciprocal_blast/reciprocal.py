@@ -1,15 +1,8 @@
 #!/usr/bin/env python
-
 import sys
 
-
-a = sys.argv[1]
-b = sys.argv[2]
-
-print('%s\t%s' %(a,b))
-
-fa = '%s.vs.%s.best' %(a,b)
-fb = '%s.vs.%s.best' %(b,a)
+fa = sys.argv[1]
+fb = sys.argv[2]
 
 bestAs = {}
 for l in open(fa):
