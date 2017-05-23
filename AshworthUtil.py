@@ -82,7 +82,7 @@ oneletter = {'ALA':'A','CYS':'C','ASP':'D','GLU':'E','PHE':'F','GLY':'G',
 						 ' DA':'a',' DC':'c',' DG':'g',' DT':'t'} # new pdb spec
 
 def get_oneletter(aa3):
-	if oneletter.has_key(aa3): return oneletter[aa3]
+	if aa3 in oneletter: return oneletter[aa3]
 	return aa3.strip()[0]
 
 threeletter = {}
@@ -94,7 +94,7 @@ threeletter['g'] = 'GUA'
 threeletter['t'] = 'THY'
 
 def get_threeletter(letter):
-	if threeletter.has_key(letter): return threeletter[letter]
+	if letter in threeletter: return threeletter[letter]
 	return 'UNK'
 
 pdb_residues = amino_acids + [' DA',' DC',' DG',' DT']
@@ -320,11 +320,11 @@ for aa,codonlist in codons.items():
 		translation_code[codon] = aa
 
 def get_codons(aa):
-	if codons.has_key(aa): return codons[aa]
+	if aa in codons: return codons[aa]
 	return ['???']
 
 def translate_codon(codon):
-	if translation_code.has_key( codon.upper() ): return translation_code[ codon.upper() ]
+	if codon.upper() in translation_code: return translation_code[ codon.upper() ]
 	return "X"
 
 def stringf_left( string, length ):
