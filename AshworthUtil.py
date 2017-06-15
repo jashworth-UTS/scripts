@@ -171,6 +171,10 @@ codons = {
 }
 
 degen_nucs = {
+	'A' : set(['A']),
+	'C' : set(['C']),
+	'G' : set(['G']),
+	'T' : set(['T']),
 	'R' : set(['A','G']),
 	'Y' : set(['C','T']),
 	'M' : set(['A','C']),

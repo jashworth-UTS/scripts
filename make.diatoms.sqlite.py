@@ -110,6 +110,7 @@ def read_gff(gff):
 		featureid = ''
 		atts = s[8].replace(',',';').split(';')
 		for att in atts:
+			att = att.strip()
 			kv = att.split('=')
 			if featuretype == 'CDS' and kv[0] == 'protein_id': featureid = kv[1]
 			elif featuretype == 'gene' and kv[0] == 'gene_id': featureid = kv[1]

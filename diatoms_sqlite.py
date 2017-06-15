@@ -4,7 +4,7 @@ import sqlite3 as sq
 con = sq.connect('diatoms.sqlite.db')
 c = con.cursor()
 
-from reciprocal_dict import Model
+from reciprocal_dict import *
 from AshworthUtil import *
 
 import pickle
@@ -46,30 +46,71 @@ def bad_coordinates(table):
 		print( c.execute('select * from %s where id=%i'%(table,i+1)).fetchall())
 	return(f)
 
-# promoter seq region relative to one cds (by cds internal db id)
-def promseq(cds,upstream=500,downstream=100):
-	if not cds: return ''
-	(id,org,seq,pid,start,end,strand) = c.execute('select * from cds where id = %i' %cds).fetchone()
-	ps = start - upstream
-	pe = end + downstream
-	if strand == 1:
-		ps = start - downstream
-		pe = end + upstream
-
-	if ps < 1: ps = 1
-
-	s = c.execute('select seq from genomic where name = "%s" AND org = "%s"' %(seq,org)).fetchone()[0]
+def seq_from_coords(orgid,seq,start,end,strand):
+	s = c.execute('select seq from genomic where org = %i AND name = "%s"' %(orgid,seq)).fetchone()[0]
 	l = len(s)
-	if ps >= l:
-		print('out of bounds, check feature %s and sequence %s for org %s' %(cds,seq,org))
-	if pe > l: pe = l
-	s = s[ps-1:pe]
-	if strand == 1:
-		s = rvs_comp_str(s)
-	return(s)
+	# note that genome is 1-indexed, and Python is 0-indexed
+	s = s[(start-1):end]
 
-def promoter_for_model(model):
-	return ('%s_%s' %(model.org,model.id), promseq(get_cdsid(model)))
+	# 1 is antisense
+	if strand == 1: return rvs_comp_str(s)
+	return s
+
+# promoter seq region relative to one cds (by cds internal db id)
+def promseq(orgid,seq,start,end,strand,us=500,ds=100):
+	s = c.execute('select seq from genomic where org = %i AND name = "%s"' %(orgid,seq)).fetchone()[0]
+	l = len(s)
+	# note that genome is 1-indexed, and Python is 0-indexed
+	start = start-1
+	end = end-1
+
+	# 1 is antisense
+	if strand == 1:
+		left = end - ds+1
+		right = end + us
+		# bounds correction
+		if left < 1: left = 1
+		if right > l: right = l
+		# note that 'end' is last included position
+		s = s[left:(end+1)] + s[(end+1):right].lower()
+		return rvs_comp_str(s)
+
+	left = start - us+1
+	right = start + ds
+	# bounds correction
+	if left < 1: left = 1
+	if right > l: right = l
+	return s[left:start].lower() + s[start:right]
+
+def get_model_coords(model):
+	orgid = get_orgid(model.org)
+	# see if model id is in cds
+	result = c.execute('select seq,start,end,strand from cds where org=%s and pid="%s"' %(orgid,model.id))
+	try:
+		(seq,start,end,strand) = result.fetchone()
+		print('cds:',model.org,orgid,seq,start,end,strand)
+	except:
+		# see if model id is in gene
+		result = c.execute('select seq,start,end,strand from gene where org=%s and gid="%s"' %(orgid,model.id))
+		try:
+			(seq,start,end,strand) = result.fetchone()
+			print('gene:',model.org,orgid,seq,start,end,strand)
+		except:
+			print('lookup failed for org %s (id %i) model id %s' %(model.org,orgid,model.id))
+			return None
+	return (orgid,seq,start,end,strand)
+
+def seq_for_model(model):
+	coords = get_model_coords(model)
+	if coords: (orgid,seq,start,end,strand) = coords
+	else: return coords
+	return ('%s_%s' %(model.org,model.id), seq_from_coords(orgid,seq,start,end,strand))
+
+def promoter_for_model(model,**kwargs):
+	coords = get_model_coords(model)
+	if coords: (orgid,seq,start,end,strand) = coords
+	else: return coords
+	return ('%s_%s' %(model.org,model.id), promseq(orgid,seq,start,end,strand,**kwargs))
 
 # ...map orthologous/homologous genes from reciprocal dicts into db...
 # ...smart/greedy extension of putative real CDS's and resulting plausible true promoter coords by protein alignment across homologs
