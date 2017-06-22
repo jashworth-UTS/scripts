@@ -20,6 +20,26 @@ def homologs(homdict,x):
 	if len(res) > 1: return(res)
 	return(res[0])
 
+def best_oneway_dict(fs):
+	orgs = {}
+	for f in fs:
+		#	"Fracy.Arath.best"
+		s = f.strip().split('.')
+		a = s[0]
+		b = s[1]
+		print('%s %s' %(a,b))
+		if not a in orgs: orgs[a] = {}
+		for l in open(f):
+			s = l.strip().split()
+			ga = s[0]
+			gb = s[1]
+			if not ga in orgs[a]: orgs[a][ga] = {}
+			orgs[a][ga][b] = Model(b,gb)
+
+	print('orgs: %s' %(' '.join(orgs.keys())))
+	return(orgs)
+
+
 def make_dict(fs):
 	orgs = {}
 	for f in fs:

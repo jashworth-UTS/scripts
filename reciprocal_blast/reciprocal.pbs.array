@@ -17,8 +17,8 @@ b=${pair[1]}
 
 #echo "$a $b"
 
-a_vs_b=$a.vs.$b.best
-b_vs_a=$b.vs.$a.best
+a_vs_b=$a.$b.best
+b_vs_a=$b.$a.best
 
 #echo "$a_vs_b $b_vs_$a"
 

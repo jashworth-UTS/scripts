@@ -16,7 +16,7 @@ pair=( `head -n $PBS_ARRAY_INDEX $pairs | tail -n 1` )
 q=${pair[0]}
 db=${pair[1]}
 #echo "q $q db $db" >> debug
-outf=`basename $q .aa.ids.fa`.vs.`basename $db .aa.ids.fa`
+outf=`basename $q .aa.ids.fa`.`basename $db .aa.ids.fa`
 
 blastp -query $q -db $db -outfmt 6 -evalue 1e-10 > $outf
 ./best_blast.py $outf > $outf.best

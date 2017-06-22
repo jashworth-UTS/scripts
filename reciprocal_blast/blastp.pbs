@@ -11,4 +11,4 @@
 
 cd $PBS_O_WORKDIR
 
-blastp -query $q -db $db -outfmt 6 -evalue 1e-10 > $q.vs.$db
+blastp -query $q -db $db -outfmt 6 -evalue 1e-10 > $q.$db
