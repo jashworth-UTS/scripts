@@ -8,7 +8,7 @@ from loci.plugins import BF
 from loci.plugins.in import ImporterOptions
 import os,sys
 
-path = '/Users/justin/UTS/Research/microscopy/2017_06_20'
+path = '/Users/justin/UTS/Research/microscopy/'
 filetab = '%s/ijfiles' %path
 
 for l in open(filetab):
@@ -36,7 +36,7 @@ for l in open(filetab):
 	opts.setId(mrgf)
 	opts.setColorMode(ImporterOptions.COLOR_MODE_COMPOSITE)
 	bio = BF.openImagePlus(opts)[0]
-	bio.show()
+#	bio.show()
 	ij.IJ.saveAs(bio.flatten(), "Tiff", '%s/%s.flat.tiff' %(path,out))
-	bio.close()
+#	bio.close()
 #	while(True): continue
