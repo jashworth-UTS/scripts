@@ -3783,6 +3783,7 @@ void PrintClstLine(ostream &os, const TOflAlignIndice::__TOflAlignRecord &rec)
 	if (!bTmMiss)
 		os << '-';
 	os << DELIMIT << '-';
+	os << DELIMIT << rec.pAlign->m_hitdef;
 }
 
 struct __MotifType
@@ -3814,13 +3815,13 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 		{
 			if (!vecDomAligns.empty())
 			{
-				os << DOMSTART << endl;
+//				os << DOMSTART << endl;
 				if (TDataModes::e_rep == dmode)
 				{
 					for (vector<TOflAlignIndice::__TOflAlignRecord> :: const_iterator iterRec = vecDomAligns.begin(), iterRecEnd = vecDomAligns.end(); iterRecEnd != iterRec; ++iterRec)
 					{
 						if (NULL == iterRec->pCDInfo) continue;
-						os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT;
+						os << DOMSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT;
 						if (1 == iterRec->pAlign->m_iRepClass)	//multi, should be no more
 							PrintDomLine(os, HITTYPE_MULTIDOM, *iterRec);
 						else if (iterRec->pAlign->m_bSpecQualified)
@@ -3845,7 +3846,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 					for (vector<TOflAlignIndice::__TOflAlignRecord> :: const_iterator iterRec = vecDomAligns.begin(), iterRecEnd = vecDomAligns.end(); iterRecEnd != iterRec; ++iterRec)
 					{
 						if (NULL == iterRec->pCDInfo) continue;
-						os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT;
+						os <<DOMSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT;
 						if (1 == iterRec->pAlign->m_iRepClass)	//multi
 							PrintDomLine(os, HITTYPE_MULTIDOM, *iterRec);
 						else if (iterRec->pAlign->m_bRep && iterRec->pAlign->m_bSpecQualified)
@@ -3862,18 +3863,18 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 					}
 				}
 
-				os << DOMEND << endl;
+//				os << DOMEND << endl;
 
 				if (g_bSuperfams)	//user want to see all superfams
 				{
-					os << FAMSTART << endl;
+//					os << FAMSTART << endl;
 					for (const auto & v : mapDomFams)
 					{
-						os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT;
+						os << FAMSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT;
 						PrintClstLine(os, v.second);
 						os << endl;
 					}
-					os << FAMEND << endl;
+//					os << FAMEND << endl;
 				}
 			}
 		}
@@ -3888,7 +3889,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 			{
 				if (!iterFeatAlign->pCDInfo->m_bIsStructDom)	//has regular domains
 				{
-					os << FEATSTART << endl;
+//					os << FEATSTART << endl;
 					for ( ; iterFeatAlignEnd != iterFeatAlign; ++iterFeatAlign)
 					{
 						if (iterFeatAlign->pCDInfo->m_bIsStructDom) break;
@@ -3924,7 +3925,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 								if (iterFeat->MotifCheck(vecMappedPos, m_dimTranslated[rfidx]) > 0) continue;	//failed motif check
 
 
-								os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT << pType << DELIMIT << iterFeat->m_strTitle << DELIMIT;
+								os << FEATSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT << pType << DELIMIT << iterFeat->m_strTitle << DELIMIT;
 
 								const TSegs& segs = featsegs.GetSegs();
 
@@ -3982,7 +3983,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 								if (iterFeat->MotifCheck(vecMappedPos, m_dimTranslated[rfidx]) > 0) continue;	//failed motif check
 
 
-								os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT << ANNOTTYPE_SPECIFIC << DELIMIT << iterFeat->m_strTitle << DELIMIT;
+								os << FEATSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT << ANNOTTYPE_SPECIFIC << DELIMIT << iterFeat->m_strTitle << DELIMIT;
 
 								const TSegs& segs = featsegs.GetSegs();
 
@@ -4003,7 +4004,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 						}
 					}
 
-					os << FEATEND << endl;
+//					os << FEATEND << endl;
 				}
 
 				// -- Motif part
@@ -4011,7 +4012,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 				{
 					// -- start SD
 					// -- features
-					os << MOTIFSTART << endl;
+//					os << MOTIFSTART << endl;
 					vector<__MotifType> :: const_iterator iterM = vecMotifRecs.begin(), iterMEnd = vecMotifRecs.end();
 					for ( ; iterMEnd != iterM; ++iterM)
 					{
@@ -4022,7 +4023,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 
 						if (!featsegs.IsEmpty() && ((double)featsegs.GetTotalResidues() / (double)iterM->iterMotifFeat->GetCompleteSize() > 0.8))
 						{
-							os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT << iterM->iterMotifFeat->m_strTitle << DELIMIT;
+							os << MOTIFSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT << iterM->iterMotifFeat->m_strTitle << DELIMIT;
 							int res0 = featsegs.GetLeft(), res1 = featsegs.GetRight(), rfidx = iterM->iterAlignRec->pAlign->GetRFIdx();
 							os << (char)toupper(m_dimTranslated[rfidx][res0]) << res0 + COORDSBASE << DELIMIT << res1 + COORDSBASE << (char)toupper(m_dimTranslated[rfidx][res1]) << DELIMIT << iterM->uiSrcPSSMId << endl;
 						}
@@ -4039,7 +4040,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 
 						if (!featsegs.IsEmpty() && ((double)featsegs.GetTotalResidues() / (double)iterM->iterMotifFeat->GetCompleteSize() > 0.8))
 						{
-							os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT << iterM->iterMotifFeat->m_strTitle << DELIMIT;
+							os << MOTIFSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT << iterM->iterMotifFeat->m_strTitle << DELIMIT;
 							int res0 = featsegs.GetLeft(), res1 = featsegs.GetRight(), rfidx = iterM->iterAlignRec->pAlign->GetRFIdx();
 							os << (char)toupper(m_dimTranslated[rfidx][res0]) << res0 + COORDSBASE << DELIMIT << res1 + COORDSBASE << (char)toupper(m_dimTranslated[rfidx][res1]) << DELIMIT << iterM->uiSrcPSSMId << endl;
 						}
@@ -4065,7 +4066,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 					//	}
 					//}
 
-					os << MOTIFEND << endl;
+//					os << MOTIFEND << endl;
 				}
 			}
 		}
@@ -4089,7 +4090,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 		{
 			map<int, TOflAlignIndice::__TOflAlignRecord > dimDomFams[TOTAL_RFS];
 
-			os << DOMSTART << endl;
+//			os << DOMSTART << endl;
 			for (int rfidx = 0; rfidx < TOTAL_RFS; ++rfidx)
 			{
 				int rf = Idx2RF(rfidx);
@@ -4100,7 +4101,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 						for (vector<TOflAlignIndice::__TOflAlignRecord> :: const_iterator iterRec = dimDomAligns[rfidx].begin(), iterRecEnd = dimDomAligns[rfidx].end(); iterRecEnd != iterRec; ++iterRec)
 						{
 							if (NULL == iterRec->pCDInfo) continue;
-							os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT;
+							os << DOMSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT;
 							if (1 == iterRec->pAlign->m_iRepClass)	//multi
 								PrintDomLine(os, HITTYPE_MULTIDOM, *iterRec);
 							else if (iterRec->pAlign->m_bSpecQualified)
@@ -4125,7 +4126,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 						for (vector<TOflAlignIndice::__TOflAlignRecord> :: const_iterator iterRec = dimDomAligns[rfidx].begin(), iterRecEnd = dimDomAligns[rfidx].end(); iterRecEnd != iterRec; ++iterRec)
 						{
 							if (NULL == iterRec->pCDInfo) continue;
-							os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT;
+							os << DOMSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT;
 							if (1 == iterRec->pAlign->m_iRepClass)	//multi
 								PrintDomLine(os, HITTYPE_MULTIDOM, *iterRec);
 							else if (iterRec->pAlign->m_bRep && iterRec->pAlign->m_bSpecQualified)
@@ -4145,24 +4146,24 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 					}
 				}
 			}
-			os << DOMEND << endl;
+//			os << DOMEND << endl;
 
 			if (g_bSuperfams)	//user want to see all superfams
 			{
-				os << FAMSTART << endl;
+//				os << FAMSTART << endl;
 				for (int rfidx = 0; rfidx < TOTAL_RFS; ++rfidx)
 				{
 					int rf = Idx2RF(rfidx);
 
 					for (const auto & v : dimDomFams[rfidx])
 					{
-						os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT;
+						os << FAMSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << DELIMIT;
 						PrintClstLine(os, v.second);
 						os << endl;
 					}
 
 				}
-				os << FAMEND << endl;
+//				os << FAMEND << endl;
 			}
 		}
 
@@ -4175,8 +4176,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 
 				bool bHasMotifs = false;
 
-				if (bHasRegFeats)
-					os << FEATSTART << endl;
+//				if (bHasRegFeats) os << FEATSTART << endl;
 
 				int iNegRF = TOTAL_RFS / 2;
 				for (int rfidx = 0; rfidx < iNegRF; ++rfidx)	//plus strand reading frames
@@ -4224,7 +4224,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 
 								if (iterFeat->MotifCheck(vecMappedPos, m_dimTranslated[rfidx]) > 0) continue;	//failed motif check
 
-								os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << pType << DELIMIT << iterFeat->m_strTitle << DELIMIT;
+								os << FEATSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << pType << DELIMIT << iterFeat->m_strTitle << DELIMIT;
 
 								const TSegs &segs = featsegs.GetSegs();
 
@@ -4291,7 +4291,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 
 								if (iterFeat->MotifCheck(vecMappedPos, m_dimTranslated[rfidx]) > 0) continue;	//failed motif check
 
-								os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << ANNOTTYPE_SPECIFIC << DELIMIT << iterFeat->m_strTitle << DELIMIT;
+								os << FEATSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << ANNOTTYPE_SPECIFIC << DELIMIT << iterFeat->m_strTitle << DELIMIT;
 
 								const TSegs &segs = featsegs.GetSegs();
 
@@ -4362,7 +4362,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 
 								if (iterFeat->MotifCheck(vecMappedPos, m_dimTranslated[rfidx]) > 0) continue;	//failed motif check
 
-								os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << pType << DELIMIT << iterFeat->m_strTitle << DELIMIT;
+								os << FEATSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << pType << DELIMIT << iterFeat->m_strTitle << DELIMIT;
 
 								const TSegs &segs = featsegs.GetSegs();
 
@@ -4429,7 +4429,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 
 								if (iterFeat->MotifCheck(vecMappedPos, m_dimTranslated[rfidx]) > 0) continue;	//failed motif check
 
-								os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << ANNOTTYPE_SPECIFIC << DELIMIT << iterFeat->m_strTitle << DELIMIT;
+								os << FEATSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << ANNOTTYPE_SPECIFIC << DELIMIT << iterFeat->m_strTitle << DELIMIT;
 
 								const TSegs &segs = featsegs.GetSegs();
 
@@ -4456,12 +4456,11 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 					}
 				}	//negative strand reading frames
 
-				if (bHasRegFeats)
-					os << FEATEND << endl;
+//				if (bHasRegFeats)	os << FEATEND << endl;
 
 				if (bHasMotifs)
 				{
-					os << MOTIFSTART << endl;
+//					os << MOTIFSTART << endl;
 
 					for (int rfidx = 0; rfidx < iNegRF; ++rfidx)
 					{
@@ -4473,7 +4472,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 
 							if (!featsegs.IsEmpty() && ((double)featsegs.GetTotalResidues() / (double)iterM->iterMotifFeat->GetCompleteSize() > 0.8))
 							{
-								os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << iterM->iterMotifFeat->m_strTitle << DELIMIT;
+								os << MOTIFSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << iterM->iterMotifFeat->m_strTitle << DELIMIT;
 								int res0 = featsegs.GetLeft(), res1 = featsegs.GetRight();
 								os << res0 + COORDSBASE << DELIMIT << res1 + RF_SIZE - 1 + COORDSBASE << DELIMIT << iterM->uiSrcPSSMId << endl;
 							}
@@ -4510,7 +4509,7 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 
 							if (!featsegs.IsEmpty() && ((double)featsegs.GetTotalResidues() / (double)iterM->iterMotifFeat->GetCompleteSize() > 0.8))
 							{
-								os << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << iterM->iterMotifFeat->m_strTitle << DELIMIT;
+								os << MOTIFSTART << DELIMIT << idxBlObj << DELIMIT << m_strQueryID << DELIMIT << m_strDefline << '[' << rf << ']' << DELIMIT << iterM->iterMotifFeat->m_strTitle << DELIMIT;
 								int res0 = featsegs.GetLeft(), res1 = featsegs.GetRight();
 								os << res1 + COORDSBASE << DELIMIT << res0 - RF_SIZE + 1 + COORDSBASE << DELIMIT << iterM->uiSrcPSSMId << endl;
 							}
@@ -4535,13 +4534,13 @@ void TOflCdQueryEx::Print(int idxBlObj, const COflDomClstInfo &domInfo, ostream 
 						//	}
 						//}
 					}
-					os << MOTIFEND << endl;
+//					os << MOTIFEND << endl;
 				}
 			}
 		}
 	}
 
-	os << QUERYEND << endl;
+//	os << QUERYEND << endl;
 	if (!g_bSilent) cerr << "End processing Query " << m_strDefline << endl;
 }
 
@@ -4669,7 +4668,7 @@ int COflRpsbPostProcessor::ProcessRpsbDataStream(istream &is, ostream &os, doubl
 
 			cdqVal.Print(objCounter, *this, os, mode);
 		}
-		os << SESSIONEND << DELIMIT << objCounter << endl;
+//		os << SESSIONEND << DELIMIT << objCounter << endl;
 		if (!g_bSilent) cerr << "RPSBlast session " << objCounter << " done..." << endl;
 	}
 	return objCounter;
