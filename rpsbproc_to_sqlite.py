@@ -29,7 +29,7 @@ cdd_tables = ['domain_hits','superfam_hits','motif_hits','site_hits']
 
 # set up tables
 
-dropall = False
+dropall = True
 #dropall = False
 if dropall:
 	print('dropping old tables')
@@ -57,6 +57,8 @@ con.commit()
 
 files = sys.argv[1:]
 
+eval_cut = 1e-6
+
 for f in files:
 	org = f.strip().split('.')[0]
 	if not org in orgs:
@@ -65,9 +67,9 @@ for f in files:
 
 	# first delete old records in CDD table(s) for this org
 	orgid = c.execute('select id from org where short="%s"' %org).fetchone()[0]
-	print('removing org %s (%i) from CDD tables (SLOW?)' %(org,orgid))
 	for t in cdd_tables:
 		if not t in tables: continue
+		print('removing org %s (%i) from %s table' %(org,orgid,t))
 		c.execute('delete from %s where org=%s' %(t,orgid))
 		con.commit()
 
@@ -78,10 +80,14 @@ for f in files:
 	for l in open(f):
 		if l.startswith('DOMAINS'):
 			s = l.strip().split('\t')
-			domain_hits.append( (orgid,s[3],s[4],s[5],s[6],s[7],s[8],s[9],s[10],s[11],s[14]) )
+			ev = float(s[8])
+			if ev<=eval_cut:
+				domain_hits.append( (orgid,s[3],s[4],s[5],s[6],s[7],s[8],s[9],s[10],s[11],s[14]) )
 		elif l.startswith('SUPERFAMILIES'):
 			s = l.strip().split('\t')
-			superfam_hits.append( (orgid,s[3],s[4],s[5],s[6],s[7],s[8],s[9],s[10],s[11],s[14]) )
+			ev = float(s[8])
+			if ev<=eval_cut:
+				superfam_hits.append( (orgid,s[3],s[4],s[5],s[6],s[7],s[8],s[9],s[10],s[11],s[14]) )
 
 	print('inserting into DB...')
 	c.executemany('insert into domain_hits(org,q,hittype,pssmid,hit_from,hit_to,eval,bitscore,accession,shortname,desc) values(?,?,?,?,?,?,?,?,?,?,?)', domain_hits)
@@ -90,7 +96,7 @@ for f in files:
 
 	c.executemany('insert into superfam_hits(org,q,hittype,pssmid,hit_from,hit_to,eval,bitscore,accession,shortname,desc) values(?,?,?,?,?,?,?,?,?,?,?)', superfam_hits)
 	con.commit()
-	print('added %i domain hits to cdd superfam_hits table for org %s (id %i)' %(len(superfam_hits),org,orgid))
+	print('added %i superfamily hits to cdd superfam_hits table for org %s (id %i)' %(len(superfam_hits),org,orgid))
 
 con.close()
 
