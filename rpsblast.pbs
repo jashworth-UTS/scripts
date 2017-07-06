@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -M justin.ashworth@uts.edu.au
+#PBS -m n
+#PBS -N rpsblast
+#PBS -o out
+#PBS -e err
+#PBS -S /bin/bash
+#PBS -l walltime=200:00:00
+#PBS -l mem=8GB
+#PBS -l ncpus=1
+
+cd $PBS_O_WORKDIR
+
+# PROVIDE TWO ARGUMENTS, e.g.:
+#qsub -q workq -v "fa=$fa,db=$db" rpsblast.pbs
+
+# standard (no xml or rpsbproc)
+#outf="$fa"_vs_"$db".rpsblast
+#rpsblast -query $fa -db $db -seg no -comp_based_stats 1 -evalue 1e-2 -outfmt 7 > $outf
+
+xml="$fa"_vs_"$db".xml
+# rpsbproc requires rpsblast -outfmt 5 (XML)
+rpsblast -query $fa -db $db -seg no -comp_based_stats 1 -evalue 1e-2 -outfmt 5 2>$xml.err 1> $xml
+rpsbproc -i $xml -m full -f -t both -e 1e-2 -o $xml.proc 2> $xml.proc.err
