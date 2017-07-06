@@ -80,7 +80,7 @@ const char * const ANNOTTYPE_GENERIC = "Generic";
 const char * const QUERY_TYPE_PEPTIDE = "Peptide";
 const char * const QUERY_TYPE_NUCLEOTIDE = "Nucleotide";
 
-const char * const PROGRAM_TITLE = "Post-RPSBLAST Processing Utility v0.11";
+const char * const PROGRAM_TITLE = "Post-RPSBLAST Processing Utility v0.11 [J Ashworth modified table output version (July 2017)]";
 
 const char * const DATASTART = "DATA";
 const char * const DATAEND = "ENDDATA";
