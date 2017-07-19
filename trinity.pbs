@@ -21,7 +21,7 @@ module load devel/jdk-current
 root=srr
 #root=srr.test
 
-opts="--seqType fq --CPU $nthread --max_memory $mem --trimmomatic --output trinity --normalize_reads"
+opts="--seqType fq --CPU $nthread --max_memory $mem --trimmomatic --output trinity --normalize_reads --jaccard_clip"
 files="--left `cat $root.left` --right `cat $root.right`"
 
 $prog $opts $files 1> trinity.out 2> trinity.err
