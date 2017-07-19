@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -M justin.ashworth@uts.edu.au
+#PBS -m n
+#PBS -N trinity
+#PBS -o log
+#PBS -e err
+#PBS -S /bin/bash
+#PBS -l walltime=200:00:00
+#PBS -l mem=128GB
+#PBS -l ncpus=48
+nthread=48
+mem="128G"
+
+cd $PBS_O_WORKDIR
+
+prog="/shared/c3/apps/Trinity-2.4.0/Trinity"
+
+# c3 module load for latest java (setup by Leo?)
+module load devel/jdk-current
+
+root=srr
+#root=srr.test
+
+opts="--seqType fq --CPU $nthread --max_memory $mem --trimmomatic --output trinity --normalize_reads"
+files="--left `cat $root.left` --right `cat $root.right`"
+
+$prog $opts $files 1> trinity.out 2> trinity.err
+
+echo "done." >> trinity.out
