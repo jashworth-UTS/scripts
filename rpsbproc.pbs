@@ -1,0 +1,18 @@
+#!/bin/bash
+#PBS -M justin.ashworth@uts.edu.au
+#PBS -m n
+#PBS -N rpsbproc
+#PBS -o out
+#PBS -e err
+#PBS -S /bin/bash
+#PBS -l walltime=200:00:00
+#PBS -l mem=4GB
+#PBS -l ncpus=1
+
+cd $PBS_O_WORKDIR
+
+# PROVIDE ARGUMENT (including from .sh scripts submitting multiple jobs):
+#qsub -q workq -v "xml=[xml file]" rpsbproc.pbs
+
+# rpsbproc requires rpsblast -outfmt 5 (XML)
+rpsbproc -i $xml -m full -f -t both -e 1e-2 -o $xml.proc 2> $xml.proc.err
