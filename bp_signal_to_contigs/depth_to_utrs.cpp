@@ -1,3 +1,10 @@
+// JA 2017
+// read samtools depth
+// create contigs above depth threshold (can span gaps, minimum lengths, see params)
+// compare to genes in GTF file
+// generate 'safe' putative 5 prime and 3 prime UTR extensions
+// output in GTF format (for subsequent inclusion with input GTF)
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
