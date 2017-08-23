@@ -1,5 +1,3 @@
-// parses samtools mpileup file, adds up counts on fwd and rvs strands, outputs these to separate files
-
 //simple method to determine contiguous regions in position data (such as samtools depth)
 //combines across gaps (-g)
 //filters out small contigs (-m)
@@ -114,7 +112,7 @@ int main(int argc, char* argv[]) {
 		for(Contigs::iterator c(contigs.begin()); c!=contigs.end(); ++c){
 //			std::cout << s->first << '\t' << c->start << '\t' << c->end << std::endl;
 // pseudo-GTF
-			std::cout << s->first <<'\t'<< "JA" <<'\t'<< "RNAseq_block" <<'\t'<< c->start <<'\t'<< c->end << "\t.\t+\t.\t" << "transcript_id \"" << s->first <<'_'<< c->start <<'_'<< c->end << "\"" << std::endl;
+			std::cout << s->first <<'\t'<< "JA" <<'\t'<< "RNAseq_block_t" << threshold << "_m" << min <<'\t'<< c->start <<'\t'<< c->end << "\t.\t+\t.\t" << "transcript_id \"" << s->first <<'_'<< c->start <<'_'<< c->end << "\"" << std::endl;
 		}
 
 	}
