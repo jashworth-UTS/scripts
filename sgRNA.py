@@ -94,18 +94,21 @@ if __name__ == "__main__":
 	seqs = loadfastas(args)
 
 	sites = {}
+	siteorder = []
 	for seqn in sorted(seqs):
 		for nuc in nucleases.values():
 			for s in nuc.re.finditer(seqs[seqn]):
 				site = Site(seqn,nuc.name,s.group(1),s.group(2),s.start(),s.end(),'fwd')
 				sites[site.name()] = site
+				siteorder.append(site.name())
 			for s in nuc.re.finditer(rvs_comp_str(seqs[seqn])):
 				site = Site(seqn,nuc.name,s.group(1),s.group(2),s.start(),s.end(),'rvs')
 				sites[site.name()] = site
+				siteorder.append(site.name())
 
 #	print(Site.header)
 	seqs = []
-	for site in sorted(sites):
+	for site in siteorder:
 #		print(str(site))
 		seqs.append( (sites[site].name(), sites[site].seq ))
 	sitesf = 'siteseqs.fa'
@@ -136,7 +139,7 @@ if __name__ == "__main__":
 		if gstrand=='minus': gstrand='rvs'
 		sites[sitename].matches.append( (gnm,mis,gsq,gstart,gend,gstrand) )
 
-	for s in sorted(sites):
+	for s in siteorder:
 		site = sites[s]
 		print(str(site))
 		for m in site.matches:
