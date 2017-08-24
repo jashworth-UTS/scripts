@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+
+# JA 2017
+# simple sgRNA finder for fasta input target sequences
+# uses blastn to check for off-target sites in input [genome] sequence
+# [the bash stuff that 'phytoCRISP-Ex' consists of is similar to this]
+
 import sys,re,os
 import subprocess
 from subprocess import Popen
@@ -88,8 +94,12 @@ def rvs_comp_str(seq):
 
 if __name__ == "__main__":
 	op=OptionParser()
-	op.add_option('-g','--genomefile')
+	op.add_option('-g','--genomefile',help='genome/background sequence file in fasta format')
 	opt,args = op.parse_args()
+
+	if(len(args)==0):
+		print('provide a target sequence file in fasta file format, and a genome/background file in fasta format')
+		sys.exit()
 
 	seqs = loadfastas(args)
 
