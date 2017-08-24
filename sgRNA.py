@@ -3,7 +3,10 @@
 # JA 2017
 # simple sgRNA finder for fasta input target sequences
 # uses blastn to check for off-target sites in input [genome] sequence
-# [the bash stuff that 'phytoCRISP-Ex' consists of is similar to this]
+# outputs sites table with blastn matches, and GTF files for visual checks (e.g. IGV)
+
+# restriction_sites file format is just multiple lines like "EcoRI GAATTC"
+# (additional file is provided for this)
 
 import sys,re,os
 import subprocess
