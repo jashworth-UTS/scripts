@@ -2,7 +2,9 @@
 
 # Justin Ashworth 2017
 # Clean/flexible/object-oriented Python sgRNA finder
-# uses [serparated isntalled!] finders (blastn, casOFFinder) to check for off-target sites in input [genome] sequence
+# picks out sites in query sequence (easy/fast with regex)
+# optional Doench et al. 'on-target score' [seprately downloaded]
+# uses [separately isntalled!] finders (blastn, casOFFinder) to check for off-target sites in input [genome] sequence
 # outputs sites table with annotated matches, GTF files for visual checks (e.g. IGV)
 
 # restriction_sites file format is just multiple lines like "EcoRI GAATTC" (additional file provided)
@@ -60,16 +62,20 @@ def mismatch_count(a,b):
 	return cnt
 
 class Nuclease:
-	def __init__(self,name,pam,tgtlen,cutpos,high_fidelity_positions=[]):
+	def __init__(self,name,pam,tgtlen,cutpos,high_fidelity_positions,us=4,ds=3):
 		self.name = name
 		self.pam = pam
 		self.tgtlen = tgtlen
 		self.cutpos = cutpos
 		self.high_fidelity_positions=high_fidelity_positions
+		# certain scoring metrics (Doench et al.) include additional sequence
+		self.us=us
+		self.ds=ds
 		self.make_re()
 	def make_re(self):
 		pam = ntexpand(self.pam)
-		self.re = re.compile('(([ACGT]{%i})%s)' %(self.tgtlen,pam))
+		# certain scoring metrics (Doench et al.) include additional sequence
+		self.re = re.compile('([ACGT]{%i})(([ACGT]{%i})%s)([ACGT]{%i})' %(self.us,self.tgtlen,pam,self.ds))
 	def tolerates(self,match,tgt):
 		for p in self.high_fidelity_positions:
 			if match[p] != tgt[p]: return False
@@ -80,10 +86,11 @@ nucleases = {
 	# recent research suggests that the necessary sgRNA is only 18-19bp in length (not 20bp)
 	# high_fidelity_positions are the 'seed' sequence positions where mismatches aren't tolerated, counting back from the 3' (PAM) side
 	# cutpos is cut site, counting back from 3' (PAM) side
-	'Cas9' : Nuclease('Cas9',pam='NGG',tgtlen=18,cutpos=-3,high_fidelity_positions=[-1,-2,-3,-4,-5,-6,-7,-8,-9,-10])
+	'Cas9' : Nuclease('Cas9',pam='NGG',tgtlen=20,cutpos=-3,high_fidelity_positions=[-1,-2,-3,-4,-5,-6,-7,-8,-9,-10])
 	# add more here as desired
 }
 
+# this line instructs compiler to autoexpand __lt__ and __eq__ into full set of comparison operators
 @total_ordering
 class SiteMatch:
 	def __init__(self,gnm,sq,start,end,strand):
@@ -106,11 +113,10 @@ class SiteMatch:
 
 		return '\t'.join(out)
 
+	# following two operators are for sorting members of this class
 	def __eq__(self,other):
 		return self.gnm == other.gnm and self.sq == other.sq and self.start == other.start and self.strand == other.strand
-
 	def __lt__(self,other):
-	# note that in Python3 they've decided to try removing the __cmp__ way of sorting classes, with no obvious way of supporting the following kind of multi-conditional sorting logic
 		if self.tolerated and not other.tolerated: return True
 		if not self.tolerated and other.tolerated: return False
 		if self.mismatches < other.mismatches: return True
@@ -215,6 +221,27 @@ class BlastFinder(SiteFinder):
 			sites[sitename].matches.append( SiteMatch(gnm,gsq,gstart,gend,gstrand) )
 		msg('done parse')
 
+class Scorer:
+	def __init__(self,exe,flags):
+		self.exe = exe
+		self.flags = flags
+
+class CFDScorer(Scorer):
+	re_score = re.compile('Rule set.*: ([0-9.-]+)')
+	def __init__(self,exe,flags=[]):
+		Scorer.__init__(self,exe,flags)
+	def score(self,site):
+		cmd = '%s --seq %s' %(self.exe,''.join([site.us,site.seq,site.ds]))
+		sys.stderr.write(cmd)
+		p = Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
+		p.wait()
+		if p.returncode != 0:
+			msg(p.stdout.read())
+			msg(p.stderr.read())
+		score = float(p.stdout.readline().strip().split()[4])
+		sys.stderr.write(' %f\n' %score)
+		return score
+
 finders = {
 	'blast' : BlastFinder('blastn',[
 		'-outfmt "6 qseqid sseqid sseq sstart send sstrand"',
@@ -242,7 +269,6 @@ class REnz:
 
 class Site:
 	sep = '\t'
-	header = sep.join(['parent','nuclease','site','sgRNA','start','end','strand','mismatches','tolerance','region'])
 	def __init__(self,parent,nuclease,seq,sgRNA,start,end,strand):
 		self.parent   = parent
 		self.nuclease = nuclease
@@ -257,16 +283,16 @@ class Site:
 	def seqmatch(self,seq):
 		su = seq.upper()
 		if su == self.seq: return True
-		if rvs_comp_str(su) == self.seq: return True
+#		if rvs_comp_str(su) == self.seq: return True
 		return False
 	def __len__(self):
 		return len(self.seq)
 	def name(self):
-		strand = 'fwd'
-		if self.strand=='antisense': strand = 'rvs'
-		return '%s_%i_%i_%s' %(self.parent,self.start,self.end,strand)
+		return '%s_%i_%i_%s' %(self.parent,self.start,self.end,self.strand)
 	def __str__(self):
 		out = ['TGT',self.name(),self.nuclease,self.seq,self.sgRNA,str(self.start),str(self.end),self.strand]
+		if hasattr(self,'ontarget'):
+			out.append('%0.2f' %self.ontarget)
 		out.append(','.join(self.REsites))
 		return self.sep.join(out)
 
@@ -316,6 +342,7 @@ if __name__ == "__main__":
 	op.add_option('-r','--refile',default='restriction_enzymes',help='restriction enzymes file in "Name Site" format')
 	op.add_option('-m','--models',default='',help='gene models file in GFF/GTF format (must define intron elements')
 	op.add_option('-a','--algorithm',default='blast',help='algorithm for finding off-target sites; options: blast, casoff')
+	op.add_option('-o','--ontarget',default='cfd',help='algorithm for on-target score (e.g. CFD if you\'ve downloaded it)')
 	op.add_option('-e','--evalue',type=float,default=1000,help='blastn evalue (approx: 1=0-2bp, 100=0-3bp, 1000=0-4bp mismatches...)')
 	op.add_option('--maxmis',type=int,default=4,help='maximum mismatches to include when finding off-target sites')
 	opt,args = op.parse_args()
@@ -339,22 +366,65 @@ if __name__ == "__main__":
 
 	seqs = loadfastas(args)
 
+	# skip sites with an early RNA polymerase III termination signal (TTTT)
+	re_pol_iii = re.compile('[T]{4}')
+
 	sites = {}
 	siteorder = []
 	for seqn in sorted(seqs):
 		for nuc in nucleases.values():
 			for s in nuc.re.finditer(seqs[seqn]):
-				site = Site(seqn,nuc.name,s.group(1),s.group(2),s.start(),s.end(),'fwd')
+				(us,sq,cr,ds) = s.groups()
+				# skip sites with an early RNA polymerase III termination signal (TTTT)
+				if re_pol_iii.search(sq):
+					msg('matching sequence with early RNA pol III terminator (TTTT) skipped %s %i %i %s' %(sq,s.start(),s.end(),'+'))
+					continue
+				site = Site(seqn,nuc.name,sq,cr,s.start(),s.end(),'+')
+				# certain scoring metrics (Doench et al.) include additional sequence
+				site.us = us
+				site.ds = ds
 				for r_e in REs:
-					if r_e.cuts(s.group(1)): site.REsites.append(str(r_e))
+					if r_e.cuts(cr): site.REsites.append(str(r_e))
 				sites[site.name()] = site
 				siteorder.append(site.name())
 			for s in nuc.re.finditer(rvs_comp_str(seqs[seqn])):
-				site = Site(seqn,nuc.name,s.group(1),s.group(2),s.start(),s.end(),'rvs')
+				(us,sq,cr,ds) = s.groups()
+				# skip sites with an early RNA polymerase III termination signal (TTTT)
+				if re_pol_iii.search(sq):
+					msg('matching sequence with early RNA pol III terminator (TTTT) skipped %s %i %i %s' %(sq,s.start(),s.end(),'-'))
+					continue
+				site = Site(seqn,nuc.name,sq,cr,s.start(),s.end(),'-')
+				site.us = us
+				site.ds = ds
 				for r_e in REs:
-					if r_e.cuts(s.group(1)): site.REsites.append(str(r_e))
+					if r_e.cuts(cr): site.REsites.append(str(r_e))
 				sites[site.name()] = site
 				siteorder.append(site.name())
+
+	if opt.ontarget == 'cfd':
+		exe = 'rs2_score_calculator.py'
+		scorer_exists = False
+		testsite = ''.join(['A' for i in range(0,24)]) + 'GGGAAA'
+		test = '%s --seq %s' %(exe,testsite)
+		sys.stderr.write('test %s' %test)
+		p=Popen(test,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
+		p.wait()
+		if p.returncode==0:
+			scorer_exists = True
+			sys.stderr.write(' (pass)\n')
+		else:
+			msg('cfd scorer script %s not found or failed' %exe)
+			msg(p.stdout.read())
+			msg(p.stderr.read())
+
+		if scorer_exists:
+			scorer = CFDScorer(exe)
+			for s in sites:
+				if not len(site.seq)==23 or site.nuclease != 'Cas9':
+					msg('CFDScorer: skipping site %s because CFD score is trained only for 20-mer crRNA-PAM Cas9 sequences [ACGT]{4}[ACGT]{20}NGG[ACGT]{3}')
+					continue
+				sites[s].ontarget = scorer.score(sites[s])
+		else: msg('CFD script %s not found' %exe)
 
 	# check for off-target sites using finder of choice
 	finder = finders[opt.algorithm]
@@ -399,7 +469,7 @@ if __name__ == "__main__":
 			print('\t'.join(['GNM',site.name(),str(m)]))
 			# GTF output for genome-verified sites
 			if m.mismatches>0: continue
-			gtfline = '%s' %'\t'.join([m.gnm,'JA',site.nuclease,str(m.start),str(m.end),'.',m.strand,'.','parent %s; id %s; seq %s; sgRNA %s; REsites %s' %(site.name(),site.name(),site.seq,site.sgRNA,','.join(site.REsites))])
+			gtfline = '%s' %'\t'.join([m.gnm,'JA',site.nuclease,str(m.start),str(m.end),'.',m.strand,'.','parent %s; id %s; seq %s; sgRNA %s; ontarget %s; REsites %s' %(site.name(),site.name(),site.seq,site.sgRNA,site.ontarget,','.join(site.REsites))])
 			gtf.write('%s\n' %gtfline)
 			if site.unique: gtfu.write('%s\n' %gtfline)
 	gtf.close()
