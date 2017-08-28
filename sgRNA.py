@@ -98,8 +98,8 @@ class SiteMatch:
 	def __str__(self):
 		out = [self.gnm,self.sq,str(self.start),str(self.end),self.strand,str(self.mismatches)]
 
-		if self.tolerated: out.append('tolerated')
-		else: out.append('untolerated')
+		if self.tolerated: out.append('***TOLERATED***')
+		else: out.append('')
 
 		if self.intronic: out.append('***INTRONIC***')
 		else: out.append('')
@@ -156,6 +156,7 @@ class CasOFFinder(SiteFinder):
 			prc = Popen(cmd,stdout=subprocess.PIPE,shell=True)
 			prc.wait()
 
+			msg('parsing cas-offinder matches')
 			for l in open(outfilename):
 				f = l.strip().split()
 				seq = f[0]
@@ -325,7 +326,6 @@ if __name__ == "__main__":
 		sys.exit()
 
 	REs = read_restriction_sites(opt.refile)
-	finder = finders[opt.algorithm]
 
 	introns = {}
 	re_intron = re.compile("(\w+)\s\w+\sintron\s(\d+)\s(\d+)")
@@ -357,6 +357,7 @@ if __name__ == "__main__":
 				siteorder.append(site.name())
 
 	# check for off-target sites using finder of choice
+	finder = finders[opt.algorithm]
 	finder.initialize([opt.genomefile])
 	flags = ['-evalue %f' %opt.evalue]
 	finder.get_matches(sites,nucleases,opt.maxmis,flags)
@@ -367,12 +368,17 @@ if __name__ == "__main__":
 	for s in sites:
 		site = sites[s]
 		nuclease = nucleases[site.nuclease]
+		ntol = 0
+		nclose = 0
+		sites[s].unique=False
 		for i in range(len(site.matches)):
 			m = site.matches[i]
 			m.mismatches = mismatch_count(m.sq,site.seq)
+			if m.mismatches > 0 and m.mismatches < 3: nclose+=1
 			if nuclease.tolerates(m.sq, site.seq):
 				# this has to index fully into original dict due to the way that Python doesn't use pointers/references
 				sites[s].matches[i].tolerated=True
+				ntol+=1
 
 			# flag for intronic cut site
 			cut = m.end + nuclease.cutpos
@@ -380,22 +386,22 @@ if __name__ == "__main__":
 			if m.gnm in introns:
 				for start,end in introns[m.gnm]:
 					if cut >= start and cut <= end:
-						sites[s].matches[i].introniv=True
+						sites[s].matches[i].intronic=True
+		if ntol==1 and nclose==0: sites[s].unique=True
 
-	gtff = 'sites.gtf'
-	gtf = open(gtff,'w')
-	gtfuf = 'unique_sites.gtf'
-	gtfu = open(gtfuf,'w')
+	outroot = 'sites.%s.%s.%i' %(opt.algorithm,opt.genomefile,opt.maxmis)
+	gtf = open('%s.gtf'%outroot,'w')
+	gtfu = open('%s.unique.gtf'%outroot,'w')
 	for s in siteorder:
 		site = sites[s]
 		print(str(site))
 		for m in sorted(site.matches):
 			print('\t'.join(['GNM',site.name(),str(m)]))
-
-			# output to GTF only if site is unique
-			gtf.write('%s\n' %'\t'.join([m.gnm,'JA',site.nuclease,str(m.start),str(m.end),'.',m.strand,'.','parent %s; id %s; seq %s; sgRNA %s; REsites %s' %(site.name(),site.name(),site.seq,site.sgRNA,','.join(site.REsites))]))
-			if len(site.matches)==1:
-				gtfu.write('%s\n' %'\t'.join([m.gnm,'JA',site.nuclease,str(m.start),str(m.end),'.',m.strand,'.','parent %s; id %s; seq %s; sgRNA %s; REsites %s' %(site.name(),site.name(),site.seq,site.sgRNA,','.join(site.REsites))]))
+			# GTF output for genome-verified sites
+			if m.mismatches>0: continue
+			gtfline = '%s' %'\t'.join([m.gnm,'JA',site.nuclease,str(m.start),str(m.end),'.',m.strand,'.','parent %s; id %s; seq %s; sgRNA %s; REsites %s' %(site.name(),site.name(),site.seq,site.sgRNA,','.join(site.REsites))])
+			gtf.write('%s\n' %gtfline)
+			if site.unique: gtfu.write('%s\n' %gtfline)
 	gtf.close()
 	gtfu.close()
 	msg('done')
