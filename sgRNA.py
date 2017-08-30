@@ -167,6 +167,9 @@ class NucSite(Site):
 	def seqmatch(self,otherseq):
 		if self.seq.upper() == otherseq.upper(): return True
 		return False
+	def crmatch(self,otherseq):
+		if self.sgRNA.upper() == otherseq.upper(): return True
+		return False
 	def pamstart(self): return len(self.sgRNA)
 	def thirtymer(self):
 		return '%s%s%s' %(self.us,self.seq,self.ds)
@@ -233,7 +236,7 @@ class SiteFinder:
 class CasOFFinder(SiteFinder):
 	def __init__(self,exe,flags):
 		SiteFinder.__init__(self,exe,flags)
-	def initialize(self,fastafilestosearch):
+	def initialize(self,fastafilestosearch,flags=[]):
 		self.fastafilestosearch = fastafilestosearch
 		self.fastadir = 'fasta'
 		if os.path.exists(self.fastadir):
@@ -244,16 +247,17 @@ class CasOFFinder(SiteFinder):
 		for f in self.fastafilestosearch:
 			copyfile(f,'%s/%s' %(self.fastadir,f))
 
-	def get_matches(self,nucsites,nucleases,maxmis,flags):
+	def get_matches(self,nucsites,nucleases,maxmis):
 		for nuc in nucleases:
-			inputfilename = 'casOFFinder.input.%s' %nuc
+			inputfilename = 'casOFFinder.input.%s.%i' %(nuc,maxmis)
 			inputfile = open(inputfilename,'w')
 			# dir containing fasta files
 			inputfile.write('%s\n' %self.fastadir)
-			tgt = ''.join(['N' for i in range(nucleases[nuc].tgtlen)]) + nucleases[nuc].pam
+#			tgt = ''.join(['N' for i in range(nucleases[nuc].tgtlen)]) + nucleases[nuc].pam
+			tgt = ''.join(['N' for i in range(nucleases[nuc].tgtlen)]) + 'NRG'
 			inputfile.write('%s\n' %tgt)
 			for site in nucsites:
-				inputfile.write('%s %i\n' %(nucsites[site].seq,maxmis))
+				inputfile.write('%s%s %i\n' %(nucsites[site].sgRNA,''.join(['N' for i in range(len(nucleases[nuc].pam))]),maxmis))
 			inputfile.close()
 
 			outfilename = '%s.results' %inputfilename
@@ -271,9 +275,9 @@ class CasOFFinder(SiteFinder):
 				gseq = f[3]
 				gstrand = f[4]
 
-				# cas-offinder doesn't keep track of site names so have to re-match
+				# cas-offinder doesn't keep track of site names so have to re-match (excluding terminal NNN triplet)
 				for sitename in nucsites:
-					if not nucsites[sitename].seqmatch(seq): continue
+					if not nucsites[sitename].crmatch(seq[:-3]): continue
 					nucsites[sitename].matches.append( SiteMatch(gnm,gseq,gstart,gstrand) )
 			msg('done parse')
 
@@ -281,7 +285,8 @@ class BlastFinder(SiteFinder):
 	def __init__(self,exe,flags):
 		SiteFinder.__init__(self,exe,flags)
 
-	def initialize(self,fastafilestosearch):
+	def initialize(self,fastafilestosearch,flags=[]):
+		self.flags.extend(flags)
 		self.fastafiletosearch=fastafilestosearch[0]
 		if os.path.exists('%s.nsq' %self.fastafiletosearch): return
 		makeblastdb = 'makeblastdb -in %s -dbtype nucl -max_file_sz 2GB' %self.fastafiletosearch
@@ -290,14 +295,14 @@ class BlastFinder(SiteFinder):
 		mdb.wait()
 		msg('done makeblastdb')
 
-	def get_matches(self,nucsites,nuclease,maxmis,flags):
+	def get_matches(self,nucsites,nuclease,maxmis):
 		seqs = []
 		for site in nucsites:
 			seqs.append( (nucsites[site].name(), nucsites[site].seq ))
 		sitesf = 'siteseqs.fa'
 		writefasta(seqs,sitesf)
 
-		cmd = '%s %s %s -db %s -query %s' %(self.exe,' '.join(self.flags),' '.join(flags),self.fastafiletosearch,sitesf)
+		cmd = '%s %s %s -db %s -query %s' %(self.exe,' '.join(self.flags),self.fastafiletosearch,sitesf)
 		msg(cmd)
 		prc = Popen(cmd,stdout=subprocess.PIPE,shell=True)
 		for h in prc.stdout:
@@ -331,8 +336,8 @@ class CFDScorer:
 	def score(self,tgt,off):
 		ltgt = len(tgt)
 		loff = len(off)
-		if not ltgt == 23 and ltgt==loff:
-			msg('WARNING CFDScorer: trained only for 20-mer crRNA-PAM Cas9 sequences [ACGT]{4}[ACGT]{20}NGG[ACGT]{3}')
+		if not ltgt == 23 and ltgt==loff or 'N' in off:
+			msg('WARNING CFDScorer: trained only for 20-mer crRNA-PAM Cas9 sequences with no N bases (site %s)' %off)
 			return 0
 		score = 1
 		tgt = tgt.replace('T','U')
@@ -468,30 +473,23 @@ if __name__ == "__main__":
 				msg(str(s))
 				nucsites[s.name()] = s
 
-	pickle.dump(nucsites,open('nucsites.p','wb'))
+#	pickle.dump(nucsites,open('nucsites.p','wb'))
 
 	if opt.ontarget == 'rs2':
 		scorer = RuleSet2Scorer()
 		if scorer.exists():
 			for s in nucsites:
-				if not len(nucsites[s].seq)==23 or nucsites[s].nuclease != 'Cas9':
-					msg('RuleSet2Scorer: skipping site %s because Rule Set 2 score is trained only for 20-mer crRNA-PAM Cas9 sequences [ACGT]{4}[ACGT]{20}NGG[ACGT]{3}')
-					continue
 				nucsites[s].ontarget = scorer.score(nucsites[s].thirtymer())
 
 	# check for off-target sites using finder of choice
 	finder = finders[opt.algorithm]
-	finder.initialize([opt.genomefile])
-	flags = ['-evalue %f' %opt.evalue]
-	finder.get_matches(nucsites,nucleases,opt.maxmis,flags)
+	finder.initialize([opt.genomefile],flags=['-evalue %f' %opt.evalue])
+	finder.get_matches(nucsites,nucleases,opt.maxmis)
 
 	if opt.offtarget == 'cfd':
 		scorer = CFDScorer()
 		if scorer.exists():
 			for s in nucsites:
-				if not len(nucsites[s].seq)==23 or nucsites[s].nuclease != 'Cas9':
-					msg('CFDScorer: skipping site %s because Rule Set 2 score is trained only for 20-mer crRNA-PAM Cas9 sequences [ACGT]{4}[ACGT]{20}NGG[ACGT]{3}')
-					continue
 				for i in range(len(nucsites[s].matches)):
 					nucsites[s].matches[i].offtarget = scorer.score(nucsites[s].seq,nucsites[s].matches[i].seq.upper())
 
