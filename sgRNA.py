@@ -248,23 +248,6 @@ class SiteFinder:
 		self.exe = exe
 		self.flags = flags
 
-# this has to be a toplevel (non-class) pseudomethod because of the way that Python's multiprocessing doesn't know know to pass class methods to subprocesses (really????)
-def CasOFFinder_check_site(line,scorer,pam):
-		f = line.split()
-		seq = f[0]
-		cr = seq[:-3]
-		gnm = f[1]
-		gstart  = int(f[2])
-		gseq = f[3]
-		gstrand = f[4]
-		score = scorer.score(cr+pam, gseq.upper())
-		# this line saves memory, in theory....
-		if score < scorer.threshold: return False, False
-		else:
-			site = SiteMatch(gnm,gseq,gstart,gstrand)
-			site.offtarget=score
-			return cr,site
-
 class CasOFFinder(SiteFinder):
 	def __init__(self,exe,flags):
 		SiteFinder.__init__(self,exe,flags)
@@ -303,21 +286,28 @@ class CasOFFinder(SiteFinder):
 
 		# get proc STDOUT and filter by offtarget score in real time
 		proc = Popen(cmd,stdout=subprocess.PIPE,shell=True)
-		results = []
 		noff=0
-		for l in proc.stdout:
-			# this should supposedly allow a pool of procs to check sites in parallel and real-time as they are dumped to STDOUT by cas-offinder
-			results.append( procpool.apply_async(CasOFFinder_check_site,(l,self.offscorer,nuclease.pam)) )
-			noff+=1
-
 		ndropped=0
-		for r in results:
-			cr,site = r.get()
-			if not site:
+		# the single parent Python process will proceed to parse cas-off output as it comes out, saving significant time
+		# c++ calls into native cas-off code would be even better
+		for l in proc.stdout:
+			noff+=1
+			f = l.split()
+			seq = f[0]
+			cr = seq[:-3]
+			gnm = f[1]
+			gstart  = int(f[2])
+			gseq = f[3]
+			gstrand = f[4]
+			# sites have to be scored/filtered in real time and not stored,
+			# 99% of sites don't pass offscorer when looking at many high mismatches (millions)
+			score = self.offscorer.score(cr+self.pam, gseq.upper())
+			if score < self.offscorer.threshold:
 				ndropped+=1
 				continue
+			site = SiteMatch(gnm,gseq,gstart,gstrand)
+			site.offtarget=score
 			nucsites[cr].matches.append(site)
-
 		return noff,ndropped
 
 class BlastFinder(SiteFinder):
@@ -527,7 +517,7 @@ if __name__ == "__main__":
 	finder.initialize([opt.genomefile],offscorer,flags=['-evalue %f' %opt.evalue])
 	noff,ndropped = finder.get_matches(nucsites,nuclease,opt.maxmis,procpool)
 
-	msg('parsed %i off-target sites, dropped %i (%2.0f%s) with %s score less than %f' %(noff,ndropped,100*ndropped/noff,'%',offscorer.__class__.__name__,opt.offtarget_threshold))
+	msg('parsed %i genomic sites, dropped %i (%2.0f%s) with %s score less than %f' %(noff,ndropped,100*ndropped/noff,'%',offscorer.__class__.__name__,opt.offtarget_threshold))
 
 	msg('re-tallying mismatches')
 	for site in nucsites.values():
