@@ -18,6 +18,7 @@ from optparse import OptionParser
 from functools import total_ordering
 import pickle
 import numpy as np
+import multiprocessing as mp
 
 # Doench Rule Set 2 score
 import model_comparison
@@ -72,12 +73,11 @@ def mismatch_count(a,b):
 re_pol_iii = re.compile('TTTT')
 
 class Nuclease:
-	def __init__(self,name,pam,tgtlen,cutpos,high_fidelity_positions,us=4,ds=3):
+	def __init__(self,name,pam,tgtlen,cutpos,us=4,ds=3):
 		self.name = name
 		self.pam = pam
 		self.tgtlen = tgtlen
 		self.cutpos = cutpos
-		self.high_fidelity_positions=high_fidelity_positions
 		# certain scoring metrics (Doench et al.) include additional sequence
 		self.us=us
 		self.ds=ds
@@ -111,21 +111,12 @@ class Nuclease:
 		sites.extend( self.findsites_onestrand(searchseq,seqn,'+') )
 		sites.extend( self.findsites_onestrand(rvs_comp_str(searchseq),seqn,'-') )
 		return sites
-	def tolerates(self,match,tgt_cr):
-		m_cr = match[:-len(self.pam)]
-		if len(m_cr) != len(tgt_cr):
-			msg('WARNING: length mismatch for %s and %s in nuclease.tolerates()' %(m_cr, tgt_cr))
-			return True
-		for p in self.high_fidelity_positions:
-			if m_cr[p] != tgt_cr[p]: return False
-		return True
 
 ### add your nuclease definitions here ###
 nucleases = {
-	# recent research suggests that the necessary sgRNA is only 18-19bp in length (not 20bp)
-	# high_fidelity_positions are the 'seed' sequence positions where mismatches aren't tolerated, counting back from the 3' (PAM) side
+	# recent research suggests that the necessary crRNA is only 18-19bp in length (not 20bp)
 	# cutpos is cut site, counting back from 3' (PAM) side
-	'Cas9' : Nuclease('Cas9',pam='NGG',tgtlen=20,cutpos=-3,high_fidelity_positions=[-1,-2,-3,-4,-5,-6,-7,-8,-9,-10])
+	'Cas9' : Nuclease('Cas9',pam='NGG',tgtlen=20,cutpos=-3)
 	# add more here as desired
 }
 
@@ -154,12 +145,12 @@ class Site:
 
 @total_ordering
 class NucSite(Site):
-	def __init__(self,parent,nuclease,us,seq,sgRNA,ds,start,strand):
+	def __init__(self,parent,nuclease,us,seq,crRNA,ds,start,strand):
 		Site.__init__(self,seq,start,strand)
 		self.parent   = parent
 		self.nuclease = nuclease
 		self.us       = us
-		self.sgRNA    = sgRNA
+		self.crRNA    = crRNA
 		self.ds       = ds
 		self.REsites  = []
 		self.matches  = []
@@ -168,15 +159,15 @@ class NucSite(Site):
 		if self.seq.upper() == otherseq.upper(): return True
 		return False
 	def crmatch(self,otherseq):
-		if self.sgRNA.upper() == otherseq.upper(): return True
+		if self.crRNA.upper() == otherseq.upper(): return True
 		return False
-	def pamstart(self): return len(self.sgRNA)
+	def pamstart(self): return len(self.crRNA)
 	def thirtymer(self):
 		return '%s%s%s' %(self.us,self.seq,self.ds)
 	def name(self):
 		return '%s_%s_%i_%s' %(self.parent,self.nuclease,self.start,self.strand)
 	def __str__(self):
-		out = ['TGT',self.name(),self.parent,self.seq,self.sgRNA,str(self.start),str(self.start+len(self.seq)),self.strand]
+		out = ['TGT',self.name(),self.parent,self.seq,self.crRNA,str(self.start),str(self.start+len(self.seq)),self.strand]
 		if hasattr(self,'ontarget'): out.append('%0.2f' %self.ontarget)
 		out.append(','.join(self.REsites))
 		return self.sep.join(out)
@@ -202,16 +193,14 @@ class SiteMatch(Site):
 		Site.__init__(self,seq,start,strand)
 		self.gnm       = gnm
 		self.mismatches = -1
-		self.tolerated = False
 		self.intronic  = False
 	def __str__(self):
 		out = [self.gnm,self.seq,str(self.start),str(self.start+len(self.seq)),self.strand,str(self.mismatches)]
-#		if self.tolerated: out.append('***TOLERATED***')
 		if hasattr(self,'offtarget'): out.append('%0.2f' %self.offtarget)
 		if self.intronic: out.append('***INTRONIC***')
 		return '\t'.join(out)
 	# following operators are for storing & sorting members of this class in lists and dicts
-	def __key(self): return (self.gnm, self.seq, self.start, self.strand, self.mismatches, self.tolerated, self.intronic)
+	def __key(self): return (self.gnm, self.seq, self.start, self.strand, self.mismatches, self.intronic)
 	def __hash__(self): return hash(self.__key())
 	def __eq__(self,other): return self.__key() == other.__key()
 	def __lt__(self,other):
@@ -219,9 +208,6 @@ class SiteMatch(Site):
 			# higher offtarget scores are most important to consider: descending sort
 			if self.offtarget > other.offtarget: return True
 			if self.offtarget < other.offtarget: return False
-		else:
-			if self.tolerated and not other.tolerated: return True
-			if not self.tolerated and other.tolerated: return False
 		if self.mismatches < other.mismatches: return True
 		if self.mismatches > other.mismatches: return False
 		if self.gnm < other.gnm: return True
@@ -257,7 +243,7 @@ class CasOFFinder(SiteFinder):
 			tgt = ''.join(['N' for i in range(nucleases[nuc].tgtlen)]) + 'NRG'
 			inputfile.write('%s\n' %tgt)
 			for site in nucsites:
-				inputfile.write('%s%s %i\n' %(nucsites[site].sgRNA,''.join(['N' for i in range(len(nucleases[nuc].pam))]),maxmis))
+				inputfile.write('%s%s %i\n' %(nucsites[site].crRNA,''.join(['N' for i in range(len(nucleases[nuc].pam))]),maxmis))
 			inputfile.close()
 
 			outfilename = '%s.results' %inputfilename
@@ -265,21 +251,20 @@ class CasOFFinder(SiteFinder):
 			msg(cmd)
 			prc = Popen(cmd,stdout=subprocess.PIPE,shell=True)
 			prc.wait()
-
-			msg('parsing cas-offinder matches')
+			# linecount (number of matches)
+				# evidently this syntax/usage is called a 'generator function'
+			noff = 0
 			for l in open(outfilename):
-				f = l.strip().split()
+				f = l.split()
 				seq = f[0]
 				gnm = f[1]
 				gstart  = int(f[2])
 				gseq = f[3]
 				gstrand = f[4]
-
-				# cas-offinder doesn't keep track of site names so have to re-match (excluding terminal NNN triplet)
-				for sitename in nucsites:
-					if not nucsites[sitename].crmatch(seq[:-3]): continue
-					nucsites[sitename].matches.append( SiteMatch(gnm,gseq,gstart,gstrand) )
-			msg('done parse')
+				nucsites[seq[:-3]].matches.append( SiteMatch(gnm,gseq,gstart,gstrand) )
+				noff+=1
+			msg('loaded %i cas-offinder matches' %noff)
+			return noff
 
 class BlastFinder(SiteFinder):
 	def __init__(self,exe,flags):
@@ -293,7 +278,6 @@ class BlastFinder(SiteFinder):
 		msg(makeblastdb)
 		mdb = Popen(makeblastdb,shell=True)
 		mdb.wait()
-		msg('done makeblastdb')
 
 	def get_matches(self,nucsites,nuclease,maxmis):
 		seqs = []
@@ -305,6 +289,7 @@ class BlastFinder(SiteFinder):
 		cmd = '%s %s %s -db %s -query %s' %(self.exe,' '.join(self.flags),self.fastafiletosearch,sitesf)
 		msg(cmd)
 		prc = Popen(cmd,stdout=subprocess.PIPE,shell=True)
+		noff = 0
 		for h in prc.stdout:
 			f = h.strip().split()
 			sitename = f[0]
@@ -320,7 +305,9 @@ class BlastFinder(SiteFinder):
 				# blast flips start and end for minus matches: fix so start is always 5' on forward strand genome coordinate
 				gstart = gend
 			nucsites[sitename].matches.append( SiteMatch(gnm,gseq,gstart,gstrand) )
-		msg('done parse')
+			noff+=1
+		msg('loaded %i blast matches' %noff)
+		return noff
 
 class CFDScorer:
 	def __init__(self,path='/home/justin/code/Doench_et_al_CRISPRCas9/CFD_Scoring'):
@@ -330,14 +317,14 @@ class CFDScorer:
 			self.pam_scores = pickle.load(open('%s/pam_scores.pkl' %self.path,'rb'))
 		except:
 			raise Exception("CFDScorer: Could not find/load files with mismatch scores or PAM scores")
-	def exists(self):
+	def works(self):
 		return hasattr(self,'mm_scores') and hasattr(self,'pam_scores')
 
 	def score(self,tgt,off):
 		ltgt = len(tgt)
 		loff = len(off)
 		if not ltgt == 23 and ltgt==loff or 'N' in off:
-			msg('WARNING CFDScorer: trained only for 20-mer crRNA-PAM Cas9 sequences with no N bases (site %s)' %off)
+#			msg('WARNING CFDScorer: trained only for 20-mer crRNA-PAM Cas9 sequences with no N bases (site %s)' %off)
 			return 0
 		score = 1
 		tgt = tgt.replace('T','U')
@@ -358,7 +345,7 @@ class RuleSet2Scorer:
 			msg('RuleSet2Scorer: loaded model from %s.' %mf)
 		except:
 			raise Exception("RuleSet2Scorer: Could not find/load model file")
-	def exists(self): return hasattr(self,'model')
+	def works(self): return hasattr(self,'model')
 	def score(self,seq):
 		if len(seq) != 30:
 			msg('RuleSet2Scorer calculates on-target scores for 30nt sequences only.')
@@ -442,6 +429,7 @@ if __name__ == "__main__":
 	op.add_option('-a','--algorithm',default='blast',help='algorithm for finding off-target sites; options: blast, casoff')
 	op.add_option('-o','--ontarget',default='',help='algorithm for on-target score (e.g. Doench Rule Set 2 if you\'ve downloaded/configed it)')
 	op.add_option('-f','--offtarget',default='',help='algorithm for off-target score (e.g. Doench CFD if you\'ve downloaded/configed it)')
+	op.add_option('-t','--offtarget_threshold',default=0.2,help='if an off-target has a score and it\'s below this number, don\'t include it in output lists')
 	op.add_option('-e','--evalue',type=float,default=1000,help='blastn evalue (approx: 1=0-2bp, 100=0-3bp, 1000=0-4bp mismatches...)')
 	op.add_option('--maxmis',type=int,default=4,help='maximum mismatches to include when finding off-target sites')
 	opt,args = op.parse_args()
@@ -450,6 +438,19 @@ if __name__ == "__main__":
 		print('provide a target sequence file in fasta file format, and a genome/background file in fasta format:\n./sgRNA.py -a blast -r restriction_enzymes -g genome.fa TARGET.fa\n')
 		op.print_help()
 		sys.exit()
+
+	# set up the scorers,
+	# and multiprocessing pool /before/ loading much of anything into memory--Pool() procs duplicate the memory of the parent process upon creation
+	onscorer = None
+	if opt.ontarget == 'rs2':
+		onscorer = RuleSet2Scorer()
+		def onscore(x): return x[0], onscorer.score(x[1])
+	offscorer = None
+	if opt.offtarget == 'cfd':
+		offscorer = CFDScorer()
+		def offscore(x): return x[0], offscorer.score(x[1],x[2])
+	# Pool must be instantiated /after/ the definition of any functions (e.g. above) that Pool::map() will call later
+	procpool = mp.Pool()
 
 	REs = read_restriction_sites(opt.refile)
 
@@ -464,80 +465,88 @@ if __name__ == "__main__":
 		msg('read introns for %i contigs' %len(introns))
 
 	seqs = loadfastas(args)
-
-	# fill name-lookup-able dict of nuc sites, as random lookup will be needed sometimes (e.g. parsing site-finder output files)
+	# fill lookup-able dict of nuc sites: random lookup will be needed sometimes (e.g. parsing cas-offinder output)
+	# using site crRNA as dict key
 	nucsites = {}
+	nonunique = []
 	for seqn in sorted(seqs):
 		for nuc in nucleases.values():
 			for s in nuc.findsites(seqs[seqn],seqn):
 				msg(str(s))
-				nucsites[s.name()] = s
+				if s.crRNA in nucsites:
+					# remember non-unique sites for removal later
+					nonunique.append(s.crRNA)
+					continue
+				nucsites[s.crRNA] = s
 
-#	pickle.dump(nucsites,open('nucsites.p','wb'))
+	#	pickle.dump(nucsites,open('nucsites.p','wb'))
 
-	if opt.ontarget == 'rs2':
-		scorer = RuleSet2Scorer()
-		if scorer.exists():
-			for s in nucsites:
-				nucsites[s].ontarget = scorer.score(nucsites[s].thirtymer())
+	for nu in nonunique:
+		msg('sites with seq %s omitted because not unique!' %ns)
+		nucsites.pop(nu)
 
-	# check for off-target sites using finder of choice
+	if onscorer and onscorer.works():
+		msg('onscores (%s) for %i found nuclease sites' %(onscorer.__class__.__name__,len(nucsites)))
+		# multiprocess onscore calculation
+		onscores = procpool.map(onscore, [(k,nucsites[k].thirtymer()) for k in nucsites.keys()])
+		for key,score in onscores: nucsites[key].ontarget = score
+
+	# find off-target sites using finder of choice (probably casOFFinder, but maybe blast or something for comparison purposes)
 	finder = finders[opt.algorithm]
 	finder.initialize([opt.genomefile],flags=['-evalue %f' %opt.evalue])
-	finder.get_matches(nucsites,nucleases,opt.maxmis)
+	n_offsites = finder.get_matches(nucsites,nucleases,opt.maxmis)
 
-	if opt.offtarget == 'cfd':
-		scorer = CFDScorer()
-		if scorer.exists():
-			for s in nucsites:
-				for i in range(len(nucsites[s].matches)):
-					nucsites[s].matches[i].offtarget = scorer.score(nucsites[s].seq,nucsites[s].matches[i].seq.upper())
+	if offscorer and offscorer.works():
+		msg('offscores: %s' %offscorer.__class__.__name__)
+		ndropped = 0
+		for site in nucsites.values():
+			offscores = procpool.map(offscore, [(i,site.seq,site.matches[i].seq.upper()) for i in range(len(site.matches))])
+			keptmatches = []
+			for i,score in offscores:
+				# record and filter off-target scores/matches
+				if score < opt.offtarget_threshold: continue
+				site.matches[i].offtarget = score
+				keptmatches.append(site.matches[i])
+			ndropped += len(site.matches)-len(keptmatches)
+			site.matches = keptmatches
+		msg('dropped %i (%2.0f%s) off-target sites with a %s score less than %f' %(ndropped,100*ndropped/n_offsites,'%',offscorer.__class__.__name__,opt.offtarget_threshold))
 
-	# check/flag matches for nuclease tolerance
-	# check/flag for cuts in intronic sequence
-	# count mismatches, sort
-	for s in nucsites:
-		site = nucsites[s]
+	msg('re-tallying mismatches')
+	for site in nucsites.values():
 		nuclease = nucleases[site.nuclease]
-		ntol = 0
-		nclose = 0
-		nucsites[s].unique=False
 		for i in range(len(site.matches)):
 			m = site.matches[i]
 			m.mismatches = mismatch_count(m.seq,site.seq)
-			if m.mismatches > 0 and m.mismatches < 3: nclose+=1
-			if nuclease.tolerates(m.seq, site.sgRNA):
-				# this has to index fully into original dict due to the way that Python doesn't use pointers/references
-				nucsites[s].matches[i].tolerated=True
-				ntol+=1
 
-			# flag for intronic cut site
-			cut = m.start + len(m.seq) + nuclease.cutpos
-			if m.strand == '-': cut = m.start+3
-			if m.gnm in introns:
-				for start,end in introns[m.gnm]:
-					if cut >= start and cut <= end:
-						nucsites[s].matches[i].intronic=True
-		if ntol==1 and nclose==0: nucsites[s].unique=True
+	if len(introns) > 0:
+		msg('checking for intronic cutsites')
+		for site in nucsites.values():
+			cutpos = nucleases[site.nuclease].cutpos
+			for i in range(len(site.matches)):
+				# flag for intronic cut site
+				cut = m.start + len(m.seq) + cutpos
+				if m.strand == '-': cut = m.start+3
+				if m.gnm in introns:
+					for start,end in introns[m.gnm]:
+						if cut >= start and cut <= end:
+							site.matches[i].intronic=True
 
-	outroot = 'sites.%s.%s.%i' %(opt.algorithm,opt.genomefile,opt.maxmis)
+	msg('GTF files')
+	outroot = '%s.sites.%s.%s.%i' %(args[0],opt.algorithm,opt.genomefile,opt.maxmis)
 	gtf = open('%s.gtf'%outroot,'w')
-	gtfu = open('%s.unique.gtf'%outroot,'w')
-	for s in sorted(nucsites):
-		site = nucsites[s]
+	for sitekey in sorted(nucsites):
+		site = nucsites[sitekey]
 		print(str(site))
 		for m in sorted(site.matches):
 			print('\t'.join(['OFF',site.name(),str(m)]))
 			if m.mismatches==0:
 				# GTF output of verified on-target sites mapped to [genome] sequence searched
-				gtfline = [m.gnm,'JA',site.nuclease,str(m.start),str(m.start+len(m.seq)),'.',m.strand,'.','parent %s; id %s; seq %s; sgRNA %s; REsites %s' %(site.name(),site.name(),site.seq,site.sgRNA,','.join(site.REsites))]
+				gtfline = [m.gnm,'JA',site.nuclease,str(m.start),str(m.start+len(m.seq)),'.',m.strand,'.','parent %s; id %s; seq %s; crRNA %s; REsites %s' %(site.name(),site.name(),site.seq,site.crRNA,','.join(site.REsites))]
 				if hasattr(site,'ontarget'): gtfline.append('; ontarget %s' %site.ontarget)
 				if hasattr(m,'offtarget'): gtfline.append('; offtarget %s' %m.offtarget)
 				gtf.write('%s\n' %'\t'.join(gtfline))
-				if site.unique: gtfu.write('%s\n' %gtfline)
-			# to do: GTF output for off-target sites (w/ IGV searchability?)
+			# to do: GTF output for off-target sites w/ genome locations/IGV searchability?
 #			else:
 
 	gtf.close()
-	gtfu.close()
 	msg('done')
