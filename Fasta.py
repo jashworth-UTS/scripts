@@ -215,6 +215,7 @@ class FastaSeqs:
 		else: return str(self)
 
 	def loadseqs(self,files):
+		totread = 0
 		for file in files:
 			if not file or not os.path.exists(file):
 				print('skipping invalid sequence file %s' %file)
@@ -228,6 +229,7 @@ class FastaSeqs:
 						if seqname in self.seqs:
 							sys.stderr.write('warning: replacing exisiting seq with same name %s\n' %seqname)
 						self.seqs[seqname] = Fasta( ''.join(seq), seqname )
+						totread += len(self.seqs[seqname])
 						self.order.append(seqname)
 						seq=[]
 					seqname=re.sub('>','',line.strip()).strip()
@@ -238,7 +240,9 @@ class FastaSeqs:
 				if seqname in self.seqs:
 					sys.stderr.write('warning: replacing exisiting seq with same name %s\n' %seqname)
 				self.seqs[seqname] = Fasta( ''.join(seq), seqname )
+				totread += len(self.seqs[seqname])
 				self.order.append(seqname)
+		sys.stderr.write('%i nucleotides read\n' %totread)
 
 	def process(self,opt):
 		if opt.promoter:
