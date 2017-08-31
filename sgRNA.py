@@ -9,19 +9,13 @@
 
 # restriction_sites file format is just multiple lines like "EcoRI GAATTC" (additional file provided)
 
-from shutil import copyfile
-import sys,os,re
-import subprocess
-from subprocess import Popen
 from optparse import OptionParser
-# total_ordering extends custom __eq__ and __lt__ class operators to be sufficient for sorting
+import sys,os,re
+import subprocess as sp
+# total_ordering extends custom __eq__ and __lt__ class operators
 from functools import total_ordering
 import pickle
-import numpy as np
 import multiprocessing as mp
-
-# Doench Rule Set 2 score
-import model_comparison
 
 def msg(_msg): sys.stderr.write('%s\n' %_msg)
 
@@ -261,6 +255,7 @@ class CasOFFinder(SiteFinder):
 				msg('\'fasta\' needs to be directory')
 				sys.exit()
 		else: os.mkdir(self.fastadir)
+		from shutil import copyfile
 		for f in self.fastafilestosearch:
 			copyfile(f,'%s/%s' %(self.fastadir,f))
 
@@ -278,18 +273,18 @@ class CasOFFinder(SiteFinder):
 		inputfile.close()
 		return inputfilename
 
-	def get_matches(self,nucsites,nuclease,maxmis,procpool):
+	def get_matches(self,nucsites,nuclease,maxmis):
 		infile = self.write_inputfile(nucsites,nuclease,maxmis)
 		# passing '-' as outfilename to cas-offinder means STDOUT
 		cmd = '%s %s C -' %(self.exe,infile)
 		msg(cmd)
 
 		# get proc STDOUT and filter by offtarget score in real time
-		proc = Popen(cmd,stdout=subprocess.PIPE,shell=True)
+		proc = sp.Popen(cmd,stdout=sp.PIPE,shell=True)
 		noff=0
 		ndropped=0
-		# the single parent Python process will proceed to parse cas-off output as it comes out, saving significant time
-		# c++ calls into native cas-off code would be even better
+		# implementing threaded CFD scoring/filtering in cas-offinder in native c++ would be the best performing solution to this bottleneck for large numbers of sites
+
 		for l in proc.stdout:
 			noff+=1
 			f = l.split()
@@ -314,13 +309,13 @@ class BlastFinder(SiteFinder):
 	def __init__(self,exe,flags):
 		SiteFinder.__init__(self,exe,flags)
 
-	def initialize(self,fastafilestosearch,flags=[]):
+	def initialize(self,fastafilestosearch,offscorer,flags=[]):
 		self.flags.extend(flags)
 		self.fastafiletosearch=fastafilestosearch[0]
 		if os.path.exists('%s.nsq' %self.fastafiletosearch): return
 		makeblastdb = 'makeblastdb -in %s -dbtype nucl -max_file_sz 2GB' %self.fastafiletosearch
 		msg(makeblastdb)
-		mdb = Popen(makeblastdb,shell=True)
+		mdb = sp.Popen(makeblastdb,shell=True)
 		mdb.wait()
 
 	def get_matches(self,nucsites,nuclease,maxmis):
@@ -330,30 +325,33 @@ class BlastFinder(SiteFinder):
 		sitesf = 'siteseqs.fa'
 		writefasta(seqs,sitesf)
 
-		cmd = '%s %s %s -db %s -query %s' %(self.exe,' '.join(self.flags),self.fastafiletosearch,sitesf)
+		msg(self.fastafiletosearch)
+		cmd = '%s %s -db %s -query %s' %(self.exe,' '.join(self.flags),self.fastafiletosearch,sitesf)
 		msg(cmd)
-		prc = Popen(cmd,stdout=subprocess.PIPE,shell=True)
+		prc = sp.Popen(cmd,stdout=sp.PIPE,shell=True)
 		noff = 0
+		# real-time/concurrent parse of STDOUT(?)
 		for h in prc.stdout:
 			f = h.strip().split()
 			sitename = f[0]
 			gnm = f[1]
-			gseq = f[2]
-			site = nucsites[sitename]
-			gstart  = int(f[3])
-			gend    = int(f[4])
-			gstrand = f[5]
+			qry = f[2]
+			gseq = f[3]
+			gstart  = int(f[4])
+			gend    = int(f[5])
+			gstrand = f[6]
 			if gstrand=='plus': gstrand='+'
 			if gstrand=='minus':
 				gstrand='-'
 				# blast flips start and end for minus matches: fix so start is always 5' on forward strand genome coordinate
 				gstart = gend
-			nucsites[sitename].matches.append( SiteMatch(gnm,gseq,gstart,gstrand) )
+			nucsites[qry[:-3]].matches.append( SiteMatch(gnm,gseq,gstart,gstrand) )
 			noff+=1
 		msg('loaded %i blast matches' %noff)
-		return noff
+		return noff,0
 
 class RuleSet2Scorer:
+	import model_comparison
 	def __init__(self,path='/home/justin/code/Doench_et_al_CRISPRCas9/Rule_Set_2_scoring_v1/saved_models'):
 		try:
 			mf = '%s/%s' %(path,'V3_model_nopos.pickle')
@@ -369,11 +367,11 @@ class RuleSet2Scorer:
 		if seq[25:27] != 'GG':
 			msg('RuleSet2Scorer calculates on-target scores for sgRNAs with NGG PAM only.')
 			return 0
-		return model_comparison.predict(seq, -1, -1, model=self.model)
+		return self.model_comparison.predict(seq, -1, -1, model=self.model)
 
 finders = {
 	'blast' : BlastFinder('blastn',[
-		'-outfmt "6 qseqid sseqid sseq sstart send sstrand"',
+		'-outfmt "6 qseqid sseqid qseq sseq sstart send sstrand"',
 		'-word_size 7',
 		'-qcov_hsp_perc 100',
 		'-ungapped',
@@ -464,7 +462,9 @@ if __name__ == "__main__":
 	offscorer = None
 	if opt.offtarget == 'cfd':
 		offscorer = CFDScorer(opt.offtarget_threshold)
-#		def offscore(x): return x[0], offscorer.score(x[1],x[2])
+	# offscorer is not multi-processed yet--due to memory limitations, off-target sites can not be all pre-loaded into memory prior to multi-proc scoring/filtering. Most off-target sites will fail a threshold filter when looking at high degrees of mismatches (millions of sites).
+	# a solution to this might be to set an upper memory limit, and multiproc score/filter subsets of the results in chunks of allowable memory
+		# implementing threaded CFD scoring/filtering in cas-offinder in native c++ would be the best performing solution to this bottleneck for large numbers of sites
 
 	# Pool must be instantiated /after/ the definition of any functions (e.g. above) that Pool::map() will call later
 	procpool = mp.Pool()
@@ -510,14 +510,17 @@ if __name__ == "__main__":
 
 	if offscorer and offscorer.works():
 		msg('offscores: %s' %offscorer.__class__.__name__)
-	else: msg('PROBLEM')
+	else: msg('PROBLEM: offscorer not found or didn\'t initialize!')
 
 	# find off-target sites using finder of choice (probably casOFFinder, but maybe blast or something for comparison purposes)
 	finder = finders[opt.algorithm]
+	msg(opt.genomefile)
 	finder.initialize([opt.genomefile],offscorer,flags=['-evalue %f' %opt.evalue])
-	noff,ndropped = finder.get_matches(nucsites,nuclease,opt.maxmis,procpool)
+	noff,ndropped = finder.get_matches(nucsites,nuclease,opt.maxmis)
 
-	msg('parsed %i genomic sites, dropped %i (%2.0f%s) with %s score less than %f' %(noff,ndropped,100*ndropped/noff,'%',offscorer.__class__.__name__,opt.offtarget_threshold))
+	pskipped = 0
+	if ndropped > 0: pskipped = 100*ndropped/noff
+	msg('parsed %i genomic sites, dropped %i (%2.0f%s) with %s score less than %f' %(noff,ndropped,pskipped,'%',offscorer.__class__.__name__,opt.offtarget_threshold))
 
 	msg('re-tallying mismatches')
 	for site in nucsites.values():
