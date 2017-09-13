@@ -9,12 +9,11 @@
 
 # restriction_sites file format is just multiple lines like "EcoRI GAATTC" (additional file provided)
 
-from optparse import OptionParser
 import sys,os,re
-import subprocess as sp
 # total_ordering extends custom __eq__ and __lt__ class operators
 from functools import total_ordering
 import pickle
+import subprocess as sp
 import multiprocessing as mp
 
 def msg(_msg): sys.stderr.write('%s\n' %_msg)
@@ -67,36 +66,44 @@ def mismatch_count(a,b):
 re_pol_iii = re.compile('TTTT')
 
 class Nuclease:
-	def __init__(self,name,pam,tgtlen,cutpos,us=4,ds=3):
+	def __init__(self,name,pam,crlen,pampos,cutpos,us=0,ds=0):
 		self.name = name
 		self.pam = pam
-		self.tgtlen = tgtlen
+		self.pampos = pampos
+		self.crlen = crlen
 		self.cutpos = cutpos
 		# certain scoring metrics (Doench et al.) include additional sequence
 		self.us=us
 		self.ds=ds
 		self.make_re()
+	def pattern(self):
+		site = ['N' for i in range(len(self.pam)+self.crlen)]
+		for i in range(len(self.pam)): site[self.pampos+i] = self.pam[i]
+		return ''.join(site)
 	def make_re(self):
-		pam = ntexpand(self.pam)
-		# certain scoring metrics (Doench et al.) include additional sequence
+		site = self.pattern()
 		# the lookahead assertion (?=) evidently allows overlapping matches for Python regex (crucial!)
-		self.re = re.compile('(?=(([ACGT]{%i})(([ACGT]{%i})%s)([ACGT]{%i})))' %(self.us,self.tgtlen,pam,self.ds))
+		site = ntexpand(site)
+		# certain scoring metrics (Doench et al.) include additional sequence
+		self.re = re.compile('(?=([ACGT]{%i})(%s)([ACGT]{%i}))' %(self.us,site,self.ds))
 	def findsites_onestrand(self,searchseq,seqn,strandstr):
 		sites = []
 		for s in self.re.finditer(searchseq):
-			(fullseq,us,seq,cr,ds) = s.groups()
-			# paranoid simple look-back to make sure Python regex/lookahead found a real site
-			if not re.search(fullseq,searchseq):
-				msg('ERROR: regex %s for %s constructed/returned a fictitious full site seq %s [fix regex!]' %(self.re.pattern,self.name,fullseq))
-				sys.exit()
+			(us,siteseq,ds) = s.groups()
 			# skip sites with an early RNA polymerase III termination signal (TTTT)
-			if re_pol_iii.search(seq):
-				msg('matching sequence with early RNA pol III terminator (TTTT) skipped %s %i %i %s' %(seq,s.start(),s.end(),strandstr))
+			if re_pol_iii.search(siteseq):
+				msg('matching sequence with early RNA pol III terminator (TTTT) skipped %s %i %i %s' %(siteseq,s.start(),s.end(),strandstr))
 				continue
-			site = NucSite(seqn,self.name,us,seq,cr,ds,s.start(),strandstr)
+			# crRNA sequence defined as all site letters not in the PAM
+			cr = []
+			for i in range(len(siteseq)):
+				if i >= self.pampos and i < self.pampos + len(self.pam): continue
+				cr.append(siteseq[i])
+			cr = ''.join(cr)
+			site = NucSite(seqn,self.name,us,siteseq,cr,ds,s.start(),strandstr)
 			# certain scoring metrics (Doench et al.) include additional sequence
 			for r_e in REs:
-				if r_e.cuts(cr): site.REsites.append(str(r_e))
+				if r_e.cuts(siteseq): site.REsites.append(str(r_e))
 			sites.append(site)
 		return sites
 	def findsites(self,searchseq,seqn):
@@ -106,12 +113,12 @@ class Nuclease:
 		sites.extend( self.findsites_onestrand(rvs_comp_str(searchseq.upper()),seqn,'-') )
 		return sites
 
-### add your nuclease definitions here ###
+### nuclease definitions ###
 nucleases = {
 	# recent research suggests that the necessary crRNA is only 18-19bp in length (not 20bp)
 	# cutpos is cut site, counting back from 3' (PAM) side
-	'Cas9' : Nuclease('Cas9',pam='NGG',tgtlen=20,cutpos=-3)
-	# add more here as desired
+	'SpCas9' : Nuclease('SpCas9',pam='NGG',crlen=20,pampos=20,cutpos=-3,us=4,ds=3),
+	'LbCpf1' : Nuclease('LbCpf1',pam='TTTV',crlen=20,pampos=0,cutpos=21),
 }
 
 @total_ordering
@@ -224,12 +231,12 @@ class CFDScorer:
 		ltgt = len(tgt)
 		loff = len(off)
 		if not ltgt == 23 and ltgt==loff or 'N' in off:
-#			msg('WARNING CFDScorer: trained only for 20-mer crRNA-PAM Cas9 sequences with no N bases (site %s)' %off)
+#			msg('WARNING CFDScorer: trained only for 20-mer crRNA-PAM SpCas9 sequences with no N bases (site %s)' %off)
 			return 0
 		score = 1
 		tgt = tgt.replace('T','U')
 		off = off.replace('T','U')
-		# this number (20) is hardcoded because of the study/scoring matrix authors created specifically for Cas9
+		# this number (20) is hardcoded because of the study/scoring matrix authors created specifically for SpCas9
 		for i in range(20):
 			if off[i] == tgt[i]: continue
 			key = 'r'+tgt[i]+':d'+rvs_comp_str(off[i])+','+str(i+1)
@@ -259,33 +266,34 @@ class CasOFFinder(SiteFinder):
 		for f in self.fastafilestosearch:
 			copyfile(f,'%s/%s' %(self.fastadir,f))
 
-	def write_inputfile(self,nucsites,nuclease,maxmis):
-		inputfilename = 'casOFFinder.input.%s.%i' %(nuclease.name,maxmis)
+	def write_inputfile(self,nucsites,nuclease,maxmis,scorethreshold):
+		inputfilename = 'casOFFinder.input.%s.%i.%f' %(nuclease.name,maxmis,scorethreshold)
 		inputfile = open(inputfilename,'w') # dir containing fasta files
 		inputfile.write('%s\n' %self.fastadir)
-		pam = nuclease.pam
-		self.pam = pam
-		if pam=='NGG': pam = 'NRG' # people are using 'NRG' for Cas9 in casOFFinder these days
-		tgt = ''.join(['N' for i in range(nuclease.tgtlen)]) + pam
-		inputfile.write('%s\n' %tgt)
-		for site in nucsites:
-			inputfile.write('%s%s %i\n' %(nucsites[site].crRNA,''.join(['N' for i in range(len(pam))]),maxmis))
+		# for SpCas9, people are a) searching for NGG sites, but b) using 'NRG' for SpCas9 in casOFFinder these days since this includes known off-targets
+		pat = nuclease.pattern()
+		if nuclease.name=='SpCas9': pat = pat.replace('NGG','NRG')
+		inputfile.write('%s\n' %pat)
+		for site in nucsites.values():
+			inputfile.write('%s %i %f\n' %(site.seq,maxmis,scorethreshold))
 		inputfile.close()
 		return inputfilename
 
-	def get_matches(self,nucsites,nuclease,maxmis):
-		infile = self.write_inputfile(nucsites,nuclease,maxmis)
+	def get_matches(self,nucsites,nuclease,maxmis,scorethreshold):
+		infile = self.write_inputfile(nucsites,nuclease,maxmis,scorethreshold)
+		if nuclease.name=='SpCas9': self.exe = 'cas-offinder-CFD'
 		# passing '-' as outfilename to cas-offinder means STDOUT
-		cmd = '%s %s C -' %(self.exe,infile)
+		cmd = '%s %s C - pam_scores.tsv cfd_mismatch_scores.tsv' %(self.exe,infile)
 		msg(cmd)
 
 		# get proc STDOUT and filter by offtarget score in real time
 		proc = sp.Popen(cmd,stdout=sp.PIPE,shell=True)
 		noff=0
 		ndropped=0
-		# implementing threaded CFD scoring/filtering in cas-offinder in native c++ would be the best performing solution to this bottleneck for large numbers of sites
-
+		# implementing threaded CFD scoring/filtering in native cas-offinder c++ would be the best performing solution to this bottleneck for large numbers of sites
+		cf=open('CasOFF.output','w')
 		for l in proc.stdout:
+			cf.write(l)
 			noff+=1
 			f = l.split()
 			seq = f[0]
@@ -294,15 +302,12 @@ class CasOFFinder(SiteFinder):
 			gstart  = int(f[2])
 			gseq = f[3]
 			gstrand = f[4]
-			# sites have to be scored/filtered in real time and not stored,
-			# 99% of sites don't pass offscorer when looking at many high mismatches (millions)
-			score = self.offscorer.score(cr+self.pam, gseq.upper())
-			if score < self.offscorer.threshold:
-				ndropped+=1
-				continue
+			score = 0
+			if len(f)>6: score = float(f[6])
 			site = SiteMatch(gnm,gseq,gstart,gstrand)
 			site.offtarget=score
-			nucsites[cr].matches.append(site)
+			nucsites[seq].matches.append(site)
+		cf.close()
 		return noff,ndropped
 
 class BlastFinder(SiteFinder):
@@ -436,6 +441,7 @@ def loadfastas(fastas):
 	return seqs
 
 if __name__ == "__main__":
+	from optparse import OptionParser
 	op=OptionParser()
 	op.add_option('-g','--genomefile',help='genome/background sequence file in fasta format')
 	op.add_option('-r','--refile',default='restriction_enzymes',help='restriction enzymes file in "Name Site" format')
@@ -462,14 +468,13 @@ if __name__ == "__main__":
 	offscorer = None
 	if opt.offtarget == 'cfd':
 		offscorer = CFDScorer(opt.offtarget_threshold)
-	# offscorer is not multi-processed yet--due to memory limitations, off-target sites can not be all pre-loaded into memory prior to multi-proc scoring/filtering. Most off-target sites will fail a threshold filter when looking at high degrees of mismatches (millions of sites).
-	# a solution to this might be to set an upper memory limit, and multiproc score/filter subsets of the results in chunks of allowable memory
-		# implementing threaded CFD scoring/filtering in cas-offinder in native c++ would be the best performing solution to this bottleneck for large numbers of sites
+		# note I've made a custom version of Cas-OFFinder that applies CFD scoring/filtering internally--use that instead if available
 
 	# Pool must be instantiated /after/ the definition of any functions (e.g. above) that Pool::map() will call later
 	procpool = mp.Pool()
 
-	nuclease = nucleases['Cas9']
+	nuclease = nucleases['SpCas9']
+#	nuclease = nucleases['LbCpf1']
 	REs = read_restriction_sites(opt.refile)
 
 	introns = {}
@@ -494,7 +499,7 @@ if __name__ == "__main__":
 				# remember non-unique sites for removal later
 				nonunique.append(s.crRNA)
 				continue
-			nucsites[s.crRNA] = s
+			nucsites[s.seq] = s
 
 	#	pickle.dump(nucsites,open('nucsites.p','wb'))
 
@@ -510,17 +515,17 @@ if __name__ == "__main__":
 
 	if offscorer and offscorer.works():
 		msg('offscores: %s' %offscorer.__class__.__name__)
-	else: msg('PROBLEM: offscorer not found or didn\'t initialize!')
 
 	# find off-target sites using finder of choice (probably casOFFinder, but maybe blast or something for comparison purposes)
 	finder = finders[opt.algorithm]
 	msg(opt.genomefile)
 	finder.initialize([opt.genomefile],offscorer,flags=['-evalue %f' %opt.evalue])
-	noff,ndropped = finder.get_matches(nucsites,nuclease,opt.maxmis)
+	noff,ndropped = finder.get_matches(nucsites,nuclease,opt.maxmis,opt.offtarget_threshold)
 
 	pskipped = 0
-	if ndropped > 0: pskipped = 100*ndropped/noff
-	msg('parsed %i genomic sites, dropped %i (%2.0f%s) with %s score less than %f' %(noff,ndropped,pskipped,'%',offscorer.__class__.__name__,opt.offtarget_threshold))
+	if ndropped > 0:
+		pskipped = 100*ndropped/noff
+		msg('parsed %i genomic sites, dropped %i (%2.0f%s) with %s score less than %f' %(noff,ndropped,pskipped,'%',offscorer.__class__.__name__,opt.offtarget_threshold))
 
 	msg('re-tallying mismatches')
 	for site in nucsites.values():
