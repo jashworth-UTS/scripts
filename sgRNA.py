@@ -88,6 +88,7 @@ class Nuclease:
 		self.re = re.compile('(?=([ACGT]{%i})(%s)([ACGT]{%i}))' %(self.us,site,self.ds))
 	def findsites_onestrand(self,searchseq,seqn,strandstr):
 		sites = []
+		seql = len(searchseq)
 		for s in self.re.finditer(searchseq):
 			(us,siteseq,ds) = s.groups()
 			# skip sites with an early RNA polymerase III termination signal (TTTT)
@@ -100,7 +101,10 @@ class Nuclease:
 				if i >= self.pampos and i < self.pampos + len(self.pam): continue
 				cr.append(siteseq[i])
 			cr = ''.join(cr)
-			site = NucSite(seqn,self.name,us,siteseq,cr,ds,s.start(),strandstr)
+			start = s.start()
+			if strandstr == '-':
+				start = seql - start
+			site = NucSite(seqn,self.name,us,siteseq,cr,ds,start,strandstr)
 			# certain scoring metrics (Doench et al.) include additional sequence
 			for r_e in REs:
 				if r_e.cuts(siteseq): site.REsites.append(str(r_e))
@@ -449,7 +453,7 @@ if __name__ == "__main__":
 	op.add_option('-a','--algorithm',default='blast',help='algorithm for finding off-target sites; options: blast, casoff')
 	op.add_option('-o','--ontarget',default='',help='algorithm for on-target score (e.g. Doench Rule Set 2 if you\'ve downloaded/configed it)')
 	op.add_option('-f','--offtarget',default='',help='algorithm for off-target score (e.g. Doench CFD if you\'ve downloaded/configed it)')
-	op.add_option('-t','--offtarget_threshold',default=0.2,help='if an off-target has a score and it\'s below this number, don\'t include it in output lists')
+	op.add_option('-t','--offtarget_threshold',type='float',default=0.2,help='if an off-target has a score and it\'s below this number, don\'t include it in output lists')
 	op.add_option('-e','--evalue',type=float,default=1000,help='blastn evalue (approx: 1=0-2bp, 100=0-3bp, 1000=0-4bp mismatches...)')
 	op.add_option('--maxmis',type=int,default=4,help='maximum mismatches to include when finding off-target sites')
 	opt,args = op.parse_args()
