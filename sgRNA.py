@@ -173,7 +173,7 @@ class NucSite(Site):
 		out.append(','.join(self.REsites))
 		return self.sep.join(out)
 	# following operators are for storing & sorting members of this class in lists and dicts
-	def __key(self): return (self.parent, self.nuclease, self.seq, self.start, self.strand)
+	def __key(self): return (self.parent, self.nuclease, self.start, self.strand, self.seq)
 	def __hash__(self): return hash(self.__key())
 	def __eq__(self,other): return self.__key() == other.__key()
 	def __lt__(self,other):
@@ -216,7 +216,7 @@ class SiteMatch(Site):
 		return self.start < other.start
 
 class CFDScorer:
-	def __init__(self,threshold,path='/home/justin/code/Doench_et_al_CRISPRCas9/CFD_Scoring'):
+	def __init__(self,threshold,path='/Users/justin/code/Doench_et_al_CRISPRCas9/CFD_Scoring'):
 		self.threshold = threshold
 		self.path = path
 		try:
@@ -357,13 +357,13 @@ class BlastFinder(SiteFinder):
 
 class RuleSet2Scorer:
 	import model_comparison
-	def __init__(self,path='/home/justin/code/Doench_et_al_CRISPRCas9/Rule_Set_2_scoring_v1/saved_models'):
-		try:
-			mf = '%s/%s' %(path,'V3_model_nopos.pickle')
-			self.model = pickle.load(open(mf,'rb'))
-			msg('RuleSet2Scorer: loaded model from %s.' %mf)
-		except:
-			raise Exception("RuleSet2Scorer: Could not find/load model file")
+	def __init__(self,path='/Users/justin/code/Doench_et_al_CRISPRCas9/Rule_Set_2_scoring_v1/saved_models'):
+#		try:
+		mf = '%s/%s' %(path,'V3_model_nopos.pickle')
+		self.model = pickle.load(open(mf,'rb'))
+		msg('RuleSet2Scorer: loaded model from %s.' %mf)
+#		except:
+#			raise Exception("RuleSet2Scorer: Could not find/load model file")
 	def works(self): return hasattr(self,'model')
 	def score(self,seq):
 		if len(seq) != 30:
@@ -549,8 +549,7 @@ if __name__ == "__main__":
 	msg('GTF files')
 	outroot = '%s.sites.%s.%s.%i' %(args[0],opt.algorithm,opt.genomefile,opt.maxmis)
 	gtf = open('%s.gtf'%outroot,'w')
-	for sitekey in sorted(nucsites):
-		site = nucsites[sitekey]
+	for k,site in sorted(nucsites.items(), key=lambda x: x[1]):
 		print(str(site))
 		for m in sorted(site.matches):
 			print('\t'.join(['OFF',site.name(),str(m)]))
