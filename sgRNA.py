@@ -219,11 +219,8 @@ class CFDScorer:
 	def __init__(self,threshold,path='/home/justin/code/Doench_et_al_CRISPRCas9/CFD_Scoring'):
 		self.threshold = threshold
 		self.path = path
-		try:
-			self.mm_scores = pickle.load(open('%s/mismatch_score.pkl' %self.path,'rb'))
-			self.pam_scores = pickle.load(open('%s/pam_scores.pkl' %self.path,'rb'))
-		except:
-			raise Exception("CFDScorer: Could not find/load files with mismatch scores or PAM scores")
+		self.mm_scores = pickle.load(open('%s/mismatch_score.pkl' %self.path,'rb'))
+		self.pam_scores = pickle.load(open('%s/pam_scores.pkl' %self.path,'rb'))
 	def works(self):
 		return hasattr(self,'mm_scores') and hasattr(self,'pam_scores')
 
@@ -358,12 +355,11 @@ class BlastFinder(SiteFinder):
 class RuleSet2Scorer:
 	import model_comparison
 	def __init__(self,path='/home/justin/code/Doench_et_al_CRISPRCas9/Rule_Set_2_scoring_v1/saved_models'):
-		try:
-			mf = '%s/%s' %(path,'V3_model_nopos.pickle')
-			self.model = pickle.load(open(mf,'rb'))
-			msg('RuleSet2Scorer: loaded model from %s.' %mf)
-		except:
-			raise Exception("RuleSet2Scorer: Could not find/load model file")
+		mf = '%s/%s' %(path,'V3_model_nopos.pickle')
+		self.model = pickle.load(open(mf,'rb'))
+		repickle = mf + '.repickled'
+		pickle.dump(self.model,open(repickle,'wb'))
+		msg('RuleSet2Scorer: loaded model from %s.' %mf)
 	def works(self): return hasattr(self,'model')
 	def score(self,seq):
 		if len(seq) != 30:

@@ -29,8 +29,8 @@ cdd_tables = ['domain_hits','superfam_hits','motif_hits','site_hits']
 
 # set up tables
 
-dropall = True
-#dropall = False
+#dropall = True
+dropall = False
 if dropall:
 	print('dropping old tables')
 	for t in cdd_tables:

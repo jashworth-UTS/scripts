@@ -1,13 +1,10 @@
 // parses samtools mpileup file, adds up counts on fwd and rvs strands, outputs these to separate files
-// (custom solution that probably replicates some other existing one that I am not aware of ;)
-// faster than Python (nice for huge files)
 
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <string>
-//#include <boost/algorithm/string.hpp>
 
 typedef std::string string;
 typedef std::ifstream ifstream;

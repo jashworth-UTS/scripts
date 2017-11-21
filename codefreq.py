@@ -130,7 +130,8 @@ def compare(qrf,bgf):
 			if lr < 0.5: flag = '*** '
 			if lr < 0.3: flag = '****'
 			sumllr += math.log(lr)
-			print('%i\t%s\t%0.3f\t%s\t%s\t%0.3f\t%s\t%0.2f' %(i,cod,fq,aa,opt,fqopt,flag,lr))
+#			print('%i\t%s\t%0.3f\t%s\t%s\t%0.3f\t%s\t%0.2f' %(i,cod,fq,aa,opt,fqopt,flag,lr))
+			print('%s\t%s\t%0.3f\t%s\t%0.3f\t%s\t%0.2f' %(aa,cod,fq,opt,fqopt,flag,lr))
 			i+=3
 		print('sum log liklihood ratio: %g' %sumllr)
 
