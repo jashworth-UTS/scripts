@@ -13,6 +13,19 @@ def loadhoms(file='reciprocal_dict.p'):
 # do this manually--slow
 #hd = loadhoms()
 
+def annotation(model):
+	ann = (domain(model), superfam(model))
+	return(ann)
+
+def domain(model):
+	oid = get_orgid(model.org)
+#	print('fetching domain for org %s (id %i) pid %s' %(model.org, oid, model.id))
+	return c.execute('select * from domain_hits where org=%i and id="%s"' %(oid,model.id)).fetchall()
+
+def superfam(model):
+	oid = get_orgid(model.org)
+	return c.execute('select * from superfam_hits where org=%i and id="%s"' %(oid,model.id)).fetchall()
+
 def writefasta(seqs,fname):
 	f=open(fname,'w')
 	for s in seqs:
