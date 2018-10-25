@@ -245,7 +245,7 @@ class FastaSeqs:
 				self.seqs[seqname] = Fasta( ''.join(seq), seqname )
 				totread += len(self.seqs[seqname])
 				self.order.append(seqname)
-		sys.stderr.write('%i nucleotides read\n' %totread)
+		sys.stderr.write('%i letters read\n' %totread)
 #		mn,mx,md = self.seqstats()
 		sys.stderr.write('min: %i, max: %i, median %i\n' %self.seqstats(False) )
 
