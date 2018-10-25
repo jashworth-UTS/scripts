@@ -106,6 +106,7 @@ def compare(qrf,bgf):
 	qry = loadfastas(qrf)
 	bg = loadfastas(bgf)
 	counts = triplet_count(bg)
+	optCDS = []
 	for n,q in qry.items():
 		i = 0
 		sumllr = 0
@@ -113,7 +114,7 @@ def compare(qrf,bgf):
 			cod = q[i:(i+3)]
 			aa = translation_code[cod]
 			aatot = 0
-			opt = ''
+			opt = cod
 			optcnt = 0
 			for allcod in codons[aa]:
 				cnt = counts[allcod]
@@ -121,6 +122,7 @@ def compare(qrf,bgf):
 				if cnt > optcnt:
 					opt = allcod
 					optcnt = cnt
+			optCDS.append(opt)
 			fq = float(counts[cod])/aatot
 			fqopt = float(optcnt)/aatot
 			lr = fq/fqopt
@@ -134,6 +136,11 @@ def compare(qrf,bgf):
 			print('%s\t%s\t%0.3f\t%s\t%0.3f\t%s\t%0.2f' %(aa,cod,fq,opt,fqopt,flag,lr))
 			i+=3
 		print('sum log liklihood ratio: %g' %sumllr)
+		optfasta = '>%s_pot\n%s\n' %(n,''.join(optCDS))
+		print(optfasta)
+		outf = open('%s_opt.nt.fa' %n, 'w')
+		outf.write(optfasta)
+		outf.close()
 
 def codefreq(fnames):
 	seqs = loadfastas(fnames)
