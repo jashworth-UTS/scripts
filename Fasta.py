@@ -242,7 +242,7 @@ class FastaSeqs:
 				self.seqs[seqname] = Fasta( ''.join(seq), seqname )
 				totread += len(self.seqs[seqname])
 				self.order.append(seqname)
-		sys.stderr.write('%i nucleotides read\n' %totread)
+		sys.stderr.write('%i letters read\n' %totread)
 
 	def process(self,opt):
 		if opt.promoter:
