@@ -7,6 +7,9 @@ import os,re,string,sys
 from optparse import OptionParser
 from AshworthUtil import translate, rvs_comp_str
 from InfoContent import *
+from numpy import median
+#import numpy as np
+import matplotlib.pyplot as plt
 
 class Fasta:
 	sep='\t'
@@ -212,7 +215,7 @@ class FastaSeqs:
 		elif opt.summarize: return self.summarize()
 		elif opt.infocontent: return self.infocontent()
 		elif opt.csv: return self.csv()
-		else: return str(self)
+		#else: return str(self)
 
 	def loadseqs(self,files):
 		totread = 0
@@ -243,6 +246,20 @@ class FastaSeqs:
 				totread += len(self.seqs[seqname])
 				self.order.append(seqname)
 		sys.stderr.write('%i nucleotides read\n' %totread)
+#		mn,mx,md = self.seqstats()
+		sys.stderr.write('min: %i, max: %i, median %i\n' %self.seqstats(False) )
+
+	def seqstats(self,hist=True):
+		lens = []
+		for seq in self.seqs.values():
+			lens.append(len(seq))
+		mn = min(lens)
+		mx = max(lens)
+		md = median(lens)
+		if hist:
+			hplot = plt.hist(lens)
+			plt.savefig('lengths.pdf')
+		return( (mn,mx,md) )
 
 	def process(self,opt):
 		if opt.promoter:
