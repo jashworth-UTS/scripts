@@ -2,33 +2,53 @@
 #PBS -M justin.ashworth@uts.edu.au
 #PBS -m n
 #PBS -N trinity
-#PBS -o log
+#PBS -o out
 #PBS -e err
 #PBS -S /bin/bash
 #PBS -l walltime=200:00:00
-#PBS -l mem=128GB
-#PBS -l ncpus=48
-nthread=48
-mem="128G"
+#PBS -l mem=240GB
+#PBS -l ncpus=24
+nthread=23
+mem="10G"
 
 cd $PBS_O_WORKDIR
 
 
-module load bio/Trinity-2.4.0
+echo "PBS script started" > $outp.out
+module load devel/jdk-current # seems to work (v1.8)
+module load devel/perl-current # not sure if required but why not
+module load devel/python2-current # hpc default is 2.6 which doesn't work w/ Trinity
+module load devel/gcc-current
 
-prog="/shared/c3/apps/Trinity-2.4.0/Trinity"
-# c3 module load for latest java (setup by Leo?)
-#module load devel/jdk-current
+module load bio/bowtie-2.3.2
+module load bio/samtools-current
 
-#root=srr
-#root=srr.test
+salmon=$HOME/code/salmon/bin/salmon
+salmon_lib=$HOME/code/salmon/lib
+export PATH=$HOME/code/salmon/bin:${PATH}
 
-# give $root (root name of .left and .right read files) as -v root=[root] to qsub
-outp=$root
+# local installed of required newer version of jellyfish
+export PATH=$HOME/code/jellyfish/bin:${PATH}
 
-opts="--seqType fq --CPU $nthread --max_memory $mem --trimmomatic --output $outp.trinity --normalize_reads --jaccard_clip"
-files="--left `cat $root.left` --right `cat $root.right`"
+# point things (i.e. Trinity itself) to local install of Trinity
+export TRINITY_HOME=$HOME/code/trinity
+trinity=$HOME/code/trinity/Trinity
 
-$prog $opts $files 1> $outp.out 2> $outp.err
+if [ -z ${TRINITY_HOME} ]; then
+    echo "Must set env var TRINITY_HOME" > $outp.err
+    exit 1
+fi
+
+echo "environment initialized" >> $outp.out
+opts="--verbose --no_cleanup --seqType fq --CPU $nthread --max_memory $mem --trimmomatic --jaccard_clip"
+echo "opts: $opts" >> $outp.out
+#files="--output $outp.trinity --left `cat $lefts` --right `cat $rights`"
+#files="--output $outp.trinity --left `ls *_R1_*` --right `ls *_R1_*`"
+files="--output $outp.trinity --samples_file samples"
+echo "files: $files" >> $outp.out
+
+echo "$trinity $opts $files" > $outp.cmd
+
+$trinity $opts $files 1>> $outp.out 2> $outp.err
 
 echo "done." >> $outp.out
