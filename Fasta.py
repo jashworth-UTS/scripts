@@ -9,6 +9,7 @@ from AshworthUtil import translate, rvs_comp_str
 from InfoContent import *
 from numpy import median
 #import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 
 class Fasta:
@@ -247,7 +248,7 @@ class FastaSeqs:
 				self.order.append(seqname)
 		sys.stderr.write('%i letters read\n' %totread)
 #		mn,mx,md = self.seqstats()
-		sys.stderr.write('min: %i, max: %i, median %i\n' %self.seqstats(False) )
+#		sys.stderr.write('min: %i, max: %i, median %i\n' %self.seqstats(True) )
 
 	def seqstats(self,hist=True):
 		lens = []
@@ -257,7 +258,14 @@ class FastaSeqs:
 		mx = max(lens)
 		md = median(lens)
 		if hist:
-			hplot = plt.hist(lens)
+			bins = max(5,int(round(len(lens)/100)))
+			hplot = plt.hist(lens,bins=bins)
+			plt.title('Sequence length distrubution')
+			ax = plt.gca()
+			plt.xscale('log')
+			ax.xaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
+			plt.xlabel('Sequence length (letters)')
+			plt.ylabel('Occurrences')
 			plt.savefig('lengths.pdf')
 		return( (mn,mx,md) )
 
