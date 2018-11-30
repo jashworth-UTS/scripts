@@ -6,10 +6,10 @@
 #PBS -e err
 #PBS -S /bin/bash
 #PBS -l walltime=200:00:00
-#PBS -l mem=240GB
-#PBS -l ncpus=24
-nthread=23
-mem="10G"
+#PBS -l mem=480GB
+#PBS -l ncpus=40
+nthread=38
+mem="12G"
 
 cd $PBS_O_WORKDIR
 
