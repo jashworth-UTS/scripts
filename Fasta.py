@@ -440,8 +440,9 @@ class FastaSeqs:
 
 	def simple_list(self):
 		seqs = []
-		for s in self.seqs.values():
-			seqs.append(s.seq)
+		for key in self.order:
+			seq = self.seqs[key]
+			seqs.append(seq.seq)
 		return seqs
 
 ################################################################################
