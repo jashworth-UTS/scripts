@@ -7,63 +7,66 @@ import pandas as pd
 import sys,math
 import pickle as p
 
-def enrichment(ff,grps,idkey,termkey,termtype,termname,typefilter):
-	t = pd.read_table(ff,sep='\t',dtype='str')
+def enrichment(infofile,grps,termidkey,termkey,typefilter,termtype,termname):
+	t = pd.read_table(infofile,dtype='str')
 	result = {}
-	termnames = {}
-	pcut = 0.05
+	termnames = {} # long description for terms
+	pcut = 0.01
 	for i,row in t.iterrows():
 		if not row[termkey] in termnames: termnames[row[termkey]] = row[termname]
 	# for filtering lists with multiple combined categories (e.g. old JGI GO table)
 	if not typefilter=='':
 		t = t[ t[typefilter].map(lambda x: x==termtype) ]
-	ll = list(t[termkey])
-	terms = set(ll)
+	allterms = list(t[termkey]) # full column of term keys (e.g. term accession numbers)
+	allids = list(t[termidkey]) # full column of protein ids
 	# bg counts
 	bg = {}
-	for term in terms:
-		bg[term] = ll.count(term)
+	uniqueterms = set(allterms) # unique set of all term keys
+	for term in uniqueterms: bg[term] = allterms.count(term) # background counts for each term
 	# for each group of ids
-	for k,g in grps:
+	for clkey,grp in grps:
 		# subtable for only this group of ids
-		tg = t[ t[idkey].map(lambda x: x in g) ]
-		# this table might be empty if no terms
-		if tg.shape[0]==0: continue
-		llg = list(tg[termkey])
+		rows = [] # table/list indices corresponding to the ids in this group
+		for i in range(len(allids)):
+			if allids[i] in grp: rows.append(i)
+		if len(rows)==0: continue
+		groupterms = [allterms[r] for r in rows] # column of term keys for this group of ids
 		#, for each term, compare group counts to background counts
 		gterms = []
-		for term in terms:
-			nt_g = llg.count(term)
-			p = hg(t.shape[0],bg[term],tg.shape[0]).pmf(nt_g)
+		for term in set(groupterms): # for all terms observed for this group
+			p = hg(len(allterms),bg[term],len(groupterms)).pmf(groupterms.count(term))
 			if p>pcut: continue
-#			print(t.shape[0], bg[term], tg.shape[0], nt_g, p)
-#			return
 			gterms.append((term,termnames[term],p))
-		if len(gterms)>0: result[k] = gterms
+		if len(gterms)>0: result[clkey] = gterms
 	return result
 
-info = sys.argv[1]
+infofile = sys.argv[1]
 clsf = sys.argv[2]
-key = 'cl'
-if len(sys.argv)>3: key = sys.argv[3]
+clkey = 'cl'
+if len(sys.argv)>3: clkey = sys.argv[3]
+clidkey = 'id'
+if len(sys.argv)>4: clidkey = sys.argv[4]
 
-# for Thaps, Nanoc, Fracy, Psemu, Phatr descriptive GO terms (old JGI)
-idkey = 'proteinId'
+# for Thaps, Phatr, Emihu, Nanoc, Fracy, Psemu, Phatr descriptive GO terms (JGI style)
+termidkey = 'proteinId'
 termkey = 'goAcc'
-typefilter = 'gotermType'
+typefilter = ''
+# uncomment and set termtype to limit to subtype of GO terms
+#typefilter = 'gotermType'
 termname = 'goName'
 termtype = 'biological_process'
 
 ## for Cyccr KOG
-## this needs to be updated with InterProScan 
-#idkey = 'augustus_id'
-#termkey = 'react'
-#typefilter = ''
-#termname = 'react'
-#termtype = ''
-#
+# needs to be updated with InterProScan to get goterms
+if 'reactome' in infofile:
+	termidkey = 'proteinId'
+	termkey = 'accession'
+	typefilter = ''
+	termname = 'reactome'
+	termtype = ''
+
 ## for Fracy, Nanoc, Psemu KOG
-#idkey = 'proteinId'
+#termidkey = 'proteinId'
 #termkey = 'kogClass'
 #typefilter = ''
 #termname = 'kogClass'
@@ -71,11 +74,14 @@ termtype = 'biological_process'
 
 cls = {}
 for i,row in pd.read_table(clsf,dtype='str').iterrows():
-	clid = str(row[key])
+	clid = str(row[clkey])
 	if clid=='NA' or clid=='nan': continue
 	if not clid in cls: cls[clid] = []
-	cls[clid].append(row['id'])
-print('%i cls loaded with %i unique keys'%(len(cls),len(set(cls.keys()))))
+	cls[clid].append(row[clidkey])
+# ensure non-redundant cluster member ids
+for c,vs in cls.items(): cls[c] = set(vs)
 
-e = enrichment(info,cls.items(),idkey,termkey,termtype,termname,typefilter)
-p.dump(e,open('terms.%s.p'%key,'wb'))
+print('%i groups loaded, infofile %s'%(len(cls),infofile))
+
+e = enrichment(infofile,cls.items(),termidkey,termkey,typefilter,termtype,termname)
+p.dump(e,open('terms.%s.p'%clkey,'wb'))
