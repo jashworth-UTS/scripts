@@ -8,7 +8,6 @@ from optparse import OptionParser
 from AshworthUtil import translate, rvs_comp_str
 from InfoContent import *
 from numpy import median
-#import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
@@ -145,6 +144,13 @@ class Fasta:
 		if sep == None: sep = self.sep
 		return '%s%s%s' %(self.name,sep,self.seq)
 
+	def GFF(self):
+		# write a basic GFF-formatted line for this seq
+#		tid = self.name.split()[0]
+		tid = self.name
+		gffstr = '\t'.join([tid,'trinity','mRNA','1',str(len(self.seq)),'.','+','.','transcript_id "%s.t1"' %tid])
+		return gffstr
+
 class SeqWindow:
 	def __init__(self,name='',start=0,end=0,antisense=False):
 		self.name=name
@@ -183,6 +189,7 @@ class FastaSeqs:
 	op=OptionParser()
 	op.add_option('-i','--infocontent',action='store_true')
 	op.add_option('-g','--nogaps',action='store_true')
+	op.add_option('--gff',action='store_true')
 	op.add_option('--filter',help='regex filter for sequence names')
 	op.add_option('--id',help='specific id to consider')
 	op.add_option('--ids',help='file containing list (single column) of specific ids to consider')
@@ -210,6 +217,7 @@ class FastaSeqs:
 		self.loadseqs(args)
 		self.process(opt)
 		if len(self.seqs)==0: return "no sequences"
+		elif opt.gff: return self.GFF()
 		elif opt.raw: return self.rawseqs()
 		elif opt.rawfiles: return self.rawfiles()
 		elif opt.separate: return self.separate(opt.overwrite)
@@ -248,7 +256,7 @@ class FastaSeqs:
 				self.order.append(seqname)
 		sys.stderr.write('%i letters read\n' %totread)
 #		mn,mx,md = self.seqstats()
-#		sys.stderr.write('min: %i, max: %i, median %i\n' %self.seqstats(True) )
+#		sys.stderr.write('min: %i, max: %i, median %i\n' %self.seqstats(False) )
 
 	def seqstats(self,hist=True):
 		lens = []
@@ -347,6 +355,10 @@ class FastaSeqs:
 
 	def nogaps(self):
 		for seq in self.seqs.values(): seq.removegaps()
+
+	def GFF(self):
+		for seq in self.seqs.values():
+			print(seq.GFF())
 
 	def rawseqs(self):
 		return ' '.join( [self.seqs[key].seq for key in self.order])
