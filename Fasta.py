@@ -226,7 +226,7 @@ class FastaSeqs:
 		elif opt.csv: return self.csv()
 		else: return str(self)
 
-	def loadseqs(self,files):
+	def loadseqs(self,files,trimnames=True):
 		totread = 0
 		for file in files:
 			if not file or not os.path.exists(file):
@@ -244,7 +244,7 @@ class FastaSeqs:
 						totread += len(self.seqs[seqname])
 						self.order.append(seqname)
 						seq=[]
-					seqname=re.sub('>','',line.strip()).strip()
+					seqname=re.sub('>','',line.strip().split()[0]).strip()
 				else:
 					seq.append( line.strip() )
 			# last hanging seq

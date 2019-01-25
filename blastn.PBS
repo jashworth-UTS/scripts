@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -M justin.ashworth@uts.edu.au
+#PBS -m n
+#PBS -N blastn
+#PBS -o blastn.out
+#PBS -e blastn.err
+#PBS -S /bin/bash
+#PBS -l walltime=24:00:00
+#PBS -l ncpus=8
+#PBS -l mem=32GB
+ncpu=8
+
+cd $PBS_O_WORKDIR
+
+outfmt="6 qseqid qlen sseqid slen pident length evalue"
+
+makeblastdb -dbtype nucl -in $s
+
+blastn -query $q -db $s -outfmt "$outfmt" -evalue 1e-10 -num_threads $ncpu > $q.$s.blastn
