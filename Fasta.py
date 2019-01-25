@@ -224,7 +224,7 @@ class FastaSeqs:
 		elif opt.summarize: return self.summarize()
 		elif opt.infocontent: return self.infocontent()
 		elif opt.csv: return self.csv()
-		#else: return str(self)
+		else: return str(self)
 
 	def loadseqs(self,files):
 		totread = 0
