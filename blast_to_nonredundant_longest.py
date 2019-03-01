@@ -106,7 +106,16 @@ if __name__ == "__main__":
 		f.close()
 	lngf.close()
 	exf = open('%s.extras.%s.fa' %(bfnm,sfx),'w')
+	incids = app.allids()
 	for k in fa.seqs:
-		if not k in app:
+		if not k in incids:
 			exf.write('>%s\n%s\n' %(k,fa.seqs[k].seq))
 	exf.close()
+	sts = []
+	for k,mates in app.items():
+		sts.append( (k,len(mates),';'.join(mates)) )
+	idxf = open('%s.stats.%s' %(bfnm,sfx),'w')
+	idxf.write('id\tn\tmates\n')
+	for k,l,mates in sorted(sts,key=lambda x: x[1],reverse=True):
+		idxf.write('%s\t%i\t%s\n' %(k,l,mates))
+	idxf.close()
