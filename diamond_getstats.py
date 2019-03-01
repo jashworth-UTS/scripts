@@ -5,8 +5,8 @@ import re
 import json
 
 # OS=Pelagophyceae sp. 03-D4 OX=882321 GN=rbcL
-# this regex is currently written specifically for a trembl DB 
-# (modify/add more regex types as needed)
+# this regex is currently written specifically for a trembl DB
+# (modify/add more regex types as needed--further code will also need modifications)
 rgxs = {
 	'diamond_trembl' : re.compile('tr\|([^\|]+?)\|.*?OS=(.*?) OX=(.*?) GN=([^ ]+)')
 }
@@ -16,6 +16,8 @@ rgx = rgxs['diamond_trembl']
 
 fls = sys.argv[1:]
 
+max_incl = 1
+
 stats = {}
 for fl in fls:
 	stats[fl] = {
@@ -24,12 +26,18 @@ for fl in fls:
 		'gn':{},
 		'gn_acc':{},
 	}
-	seen = {}
+	counts = {}
 	for l in open(fl):
 		qid = l.split()[0]
-		if qid in seen: continue
-		else: seen[qid] = True
-		acc,os,ox,gn = rgx.search(l).groups()
+
+		# limit included tabulation to first (top) N matches
+		if not qid in counts: counts[qid] = 0
+		counts[qid] += 1
+		if counts[qid] > max_incl: continue
+
+		m = rgx.search(l)
+		if m == None: continue
+		acc,os,ox,gn = m.groups()
 		gn_acc = '%s_%s' %(gn,acc)
 		if not os in stats[fl]['os']: stats[fl]['os'][os] = 0
 #		if not ox in stats[fl]['ox']: stats[fl]['ox'][ox] = 0
