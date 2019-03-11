@@ -12,9 +12,26 @@ dat = json.load(open(sys.argv[1]))
 fields = [
 	'os',
 	'gn',
-	'gn_acc',
+#	'gn_acc',
 ]
 n_topcls = 30
+normtype = 'all'
+#normtype = 'incl'
+
+collapse_spc = True
+
+if collapse_spc:
+	for grp in dat:
+		collapsed = {}
+		drop = []
+		for cls,val in dat[grp]['os'].items():
+			key = ' '.join(cls.strip().split()[:2])
+			if not key in collapsed: collapsed[key] = 0
+			collapsed[key] += val
+			drop.append(cls)
+		for d in drop: dat[grp]['os'].pop(d)
+		for k,v in collapsed.items():
+			dat[grp]['os'][k] = v
 
 for field in fields:
 
@@ -26,12 +43,20 @@ for field in fields:
 		classes = dat[grp][field]
 		norms[grp] = {}
 		valsum = 0
-		for val in classes.values(): valsum += val
+
+		if normtype == 'all':
+		# normalize 'fraction total' by ALL classes
+			for val in classes.values(): valsum += int(val)
+		elif normtype == 'incl':
+			for cls,val in sorted(classes.items(), key=lambda x: x[1], reverse=True)[:n_topcls]:
+				#	normalize 'fraction total' by only included classes
+				valsum += int(val)
 		if valsum > maxsum: maxsum = valsum
+
 		for cls,val in sorted(classes.items(), key=lambda x: x[1], reverse=True)[:n_topcls]:
 			norms[grp][cls] = float(val)/valsum
 			if not cls in allclasses: allclasses[cls] = 0
-			allclasses[cls] += val
+			allclasses[cls] += int(val)
 
 	ngrps = len(dat)
 	fig,axes = pyplot.subplots(2,1)
@@ -39,6 +64,7 @@ for field in fields:
 	rmarg = 0.5
 	pyplot.subplots_adjust(bottom=0.3,left=0.15,right=rmarg)
 	cmap = matplotlib.cm.get_cmap('tab10')
+	ncolors = 10
 
 	# abs values
 	axes[0].set_ylabel('Reads')
@@ -48,9 +74,9 @@ for field in fields:
 	axes[0].set_xticklabels([])
 
 	def coli(cls):
-		keys = [k for k,v in sorted(allclasses.items(),key=lambda x: x[1])]
+		keys = [k for k,v in sorted(allclasses.items(),key=lambda x: x[1],reverse=True)]
 		#coli = float(keys.index(cls)) / len(keys)
-		coli = float(keys.index(cls) % 10)/10
+		coli = float(keys.index(cls) % ncolors)/ncolors
 		print(cls,coli)
 		return(coli)
 
@@ -67,7 +93,8 @@ for field in fields:
 	axes[1].set_ylim(0,1)
 	axes[1].set_xlim(0.5,ngrps+0.5)
 	axes[1].set_xticks(range(1,ngrps+1))
-	xticklabs = [g[:10]+'..'+g[-3:] for g in grps]
+	xticklabs = [g[:15] for g in grps]
+#	xticklabs = [g[:10]+'..'+g[-3:] for g in grps]
 	axes[1].set_xticklabels(xticklabs,rotation=60,ha='right')
 
 	x = 0
