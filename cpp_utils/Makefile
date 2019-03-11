@@ -12,22 +12,29 @@ CXXFLAGS = $(WFLAGS) $(DBFLAGS)
 OFLAGS = -O3
 CXXFLAGS = $(WFLAGS) $(OFLAGS)
 
-EXE = get_fasta_by_id
-OBJECTFILES = get_fasta_by_id.o
-
 # external libraries
 LDLIBS = -lstdc++
 #LDFLAGS = -pg
 
-# build targets
-all: $(EXE)
+PROGS = table_parser\
+	get_fasta_by_id	
 
-$(EXE): $(OBJECTFILES)
-#	$(CXX) $(OBJECTFILES) $(LDLIBS) -o $(EXE) $(LDFLAGS)
-	$(CXX) $(OBJECTFILES) $(LDLIBS) -o $(EXE)
+PROGSOBJS = table_parser.o\
+	get_fasta_by_id.o	
+
+#EXE = get_fasta_by_id
+#OBJECTFILES = get_fasta_by_id.o
+
+# build targets
+#all: $(EXE)
+all: $(PROGS)
 
 clean:
-	-rm *.o $(EXE)
+	-rm ${PROGS} ${PROGOBJS}
+
+#$(EXE): $(OBJECTFILES)
+##	$(CXX) $(OBJECTFILES) $(LDLIBS) -o $(EXE) $(LDFLAGS)
+#	$(CXX) $(OBJECTFILES) $(LDLIBS) -o $(EXE)
 
 .PHONY: tags
 tags:
