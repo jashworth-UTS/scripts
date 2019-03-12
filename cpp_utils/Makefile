@@ -6,7 +6,7 @@ WFLAGS = -Wall -W -Wextra -pedantic -Wno-attributes
 # debug build flags
 #DBFLAGS = -ggdb -pg
 DBFLAGS = -ggdb -static
-CMPLFLAGS = -std=c++11
+CMPLFLAGS = -pthread -std=c++11
 CXXFLAGS = $(WFLAGS) $(DBFLAGS) $(CMPLFLAGS)
 
 # performance build flags
