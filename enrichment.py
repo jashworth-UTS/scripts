@@ -34,7 +34,8 @@ def enrichment(infofile,grps,termidkey,termkey,typefilter,termtype,termname):
 		#, for each term, compare group counts to background counts
 		gterms = []
 		for term in set(groupterms): # for all terms observed for this group
-			p = hg(len(allterms),bg[term],len(groupterms)).pmf(groupterms.count(term))
+#			p = hg(len(allterms),bg[term],len(groupterms)).pmf(groupterms.count(term))
+			p = hg.sf(groupterms.count(term)-1,len(allterms),bg[term],len(groupterms))
 			if p>pcut: continue
 			gterms.append((term,termnames[term],p))
 		if len(gterms)>0: result[clkey] = gterms

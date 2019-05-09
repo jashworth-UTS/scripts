@@ -92,12 +92,12 @@ class JobLogger:
 		errf.close()
 
 	def getstats(self):
-		qstat = subprocess.Popen(['qstat -f'],shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+#		qstat = subprocess.Popen(['qstat -f'],shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 		# use something like the following if you have SSH keys set up for remote PBSPro head node
 		# you need to put 'export PATH=/usr/pbs/bin:${PATH}' into your ~/.bashrc file on the HPC server for UTS
 #		qstat = subprocess.Popen(['ssh [yourID]@138.25.37.51 qstat -f'],shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 		# or if you have an $hpc environment variable set (e.g. in your .bashrc)
-#		qstat = subprocess.Popen(['ssh $hpc qstat -f'],shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+		qstat = subprocess.Popen(['ssh $hpc qstat -f'],shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 		ret = qstat.wait()
 		stdout,stderr = qstat.communicate()
 #		print(stdout,stderr) # debug
