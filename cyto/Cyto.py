@@ -101,6 +101,8 @@ class Cyto:
 		statkey = 'median_%s' %ch
 		self.stats[statkey] = rawmed
 		if plot:
+			fg,ax = plt.subplots()
+			plt.subplots_adjust(left=0.2)
 			med = rawmed
 			if logdata:
 				dd = [numpy.log10(d) for d in dd if d>0]
@@ -108,12 +110,11 @@ class Cyto:
 			nn,bins,patches = ax.hist(dd,bins=100,color='black')
 			maxn = numpy.max(nn)
 
-			fg,ax = plt.subplots()
-			plt.subplots_adjust(left=0.2)
 			ax.set_ylim(0,maxn)
 			ax.plot([med,med],[0,1e4],color='red')
 			ax.text(med*0.9,maxn*0.9,'%g' %rawmed,ha='right',color='red')
-			ax.set_ylabel(ch,rotation=0,ha='right')
+			ax.set_xlabel(ch)
+			ax.set_ylabel('counts')
 			if not xrng == []:
 				ax.set_xlim(numpy.log10(xrng[0]),numpy.log10(xrng[1]))
 			fg.savefig('%s.%s.hist.png' %(self.prf,ch))
@@ -240,7 +241,7 @@ if __name__ == "__main__":
 	#		clusterer = DBSCAN(eps=2e5,min_samples=500)
 			c.cluster(clusterer,cl_chs)
 #		for chs,xrng,yrng in plots2d: c.plot2ch(chs,xrng,yrng)
-		for ch,xrng in hists: c.plothist(ch,xrng,plot=False)
+		for ch,xrng in hists: c.plothist(ch,xrng,plot=True)
 		cytos[f] = c
 
 	stats = []
