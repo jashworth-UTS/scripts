@@ -95,26 +95,28 @@ class Cyto:
 		self.clusters['FSC_lf_outliers'] = outliers
 		msg('%i events flagged as outliers by FSC H/A filter' %list(outliers).count(True))
 
-	def plothist(self,ch,xrng,logdata=True):
-		fg,ax = plt.subplots()
-		plt.subplots_adjust(left=0.2)
+	def plothist(self,ch,xrng,logdata=True,plot=True):
 		dd = self.dat.data[ch]
 		rawmed = numpy.median(dd)
-		med = rawmed
-		if logdata:
-			dd = [numpy.log10(d) for d in dd if d>0]
-			med = numpy.log10(med)
-		nn,bins,patches = ax.hist(dd,bins=100,color='black')
-		maxn = numpy.max(nn)
-		ax.set_ylim(0,maxn)
-		ax.plot([med,med],[0,1e4],color='red')
-		ax.text(med*0.9,maxn*0.9,'%g' %rawmed,ha='right',color='red')
-		ax.set_ylabel(ch,rotation=0,ha='right')
-		if not xrng == []:
-			ax.set_xlim(numpy.log10(xrng[0]),numpy.log10(xrng[1]))
-		fg.savefig('%s.%s.hist.png' %(self.prf,ch))
 		statkey = 'median_%s' %ch
 		self.stats[statkey] = rawmed
+		if plot:
+			med = rawmed
+			if logdata:
+				dd = [numpy.log10(d) for d in dd if d>0]
+				med = numpy.log10(med)
+			nn,bins,patches = ax.hist(dd,bins=100,color='black')
+			maxn = numpy.max(nn)
+
+			fg,ax = plt.subplots()
+			plt.subplots_adjust(left=0.2)
+			ax.set_ylim(0,maxn)
+			ax.plot([med,med],[0,1e4],color='red')
+			ax.text(med*0.9,maxn*0.9,'%g' %rawmed,ha='right',color='red')
+			ax.set_ylabel(ch,rotation=0,ha='right')
+			if not xrng == []:
+				ax.set_xlim(numpy.log10(xrng[0]),numpy.log10(xrng[1]))
+			fg.savefig('%s.%s.hist.png' %(self.prf,ch))
 
 	def plot2ch(self,chs,xrng,yrng):
 		msg('plotting %s' %','.join(chs))
@@ -237,8 +239,8 @@ if __name__ == "__main__":
 			# DBSCAN: it works, but it very touchy w.r.t. params, highly variable results
 	#		clusterer = DBSCAN(eps=2e5,min_samples=500)
 			c.cluster(clusterer,cl_chs)
-		for chs,xrng,yrng in plots2d: c.plot2ch(chs,xrng,yrng)
-		for ch,xrng in hists: c.plothist(ch,xrng)
+#		for chs,xrng,yrng in plots2d: c.plot2ch(chs,xrng,yrng)
+		for ch,xrng in hists: c.plothist(ch,xrng,plot=False)
 		cytos[f] = c
 
 	stats = []
@@ -261,25 +263,50 @@ if __name__ == "__main__":
 		('median_mVenus FITC-A','median_Chorophyll PC5.5-A'),
 	]
 	
+	namecols = { 
+#		'A' : 'red',
+#		'B' : 'red',
+#		'C' : 'red',
+#		'D' : 'red',
+#		'E' : 'blue',
+#		'F' : 'blue',
+#		'G' : 'blue',
+#		'H' : 'blue',
+		'A' : 'red',
+		'B' : 'green',
+		'C' : 'blue',
+		'D' : 'gray',
+		'E' : 'purple',
+		'F' : 'orange',
+		'G' : 'cyan',
+		'H' : 'magenta',
+	}
+
 	for xch,ych in statplots2d:
-		fg,ax = plt.subplots()
-		plt.subplots_adjust(left=0.3)
 		lab = []
+		cols = []
 		xv = []
 		yv = []
 		xi = header.index(xch)
 		yi = header.index(ych)
 		for row in res:
-			lab.append(re.sub('\.fcs.*','',row[0]))
+			lb = re.sub('\.fcs.*','',row[0])
+			lb = lb.split('-')[-1]
+			col = 'black'
+			for nm in namecols:
+				if nm in lb: col = namecols[nm]
+			cols.append(col)
+			lab.append(lb)
 			xv.append(row[xi])
 			yv.append(row[yi])
 		print(xv)
 		print(yv)
 		print(lab)
-		ax.scatter(xv,yv)
+		fg,ax = plt.subplots()
+		plt.subplots_adjust(left=0.3)
+		ax.scatter(xv,yv,color=cols)
 		for i in range(len(xv)):
-			ax.text(xv[i],yv[i],lab[i],ha='right')
+			ax.text(xv[i],yv[i],lab[i],ha='right',color=cols[i])
 		ax.set_xlabel(xch)
 		ax.set_ylabel(ych)
 		fg.savefig('statplot.png')
-
