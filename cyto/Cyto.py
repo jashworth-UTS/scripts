@@ -2,7 +2,8 @@
 
 '''
 Python utility script for reading and auto-processing .fcs flow cytometry data files.
-See required dependencies (library imports) below: install them via 'sudo pip3 install [x]' under linux or OS X (not sure about how Python lib installs work in Windows)
+See required dependencies (library imports) below: install them via 'sudo pip3 install [x]' under linux or OS X
+# (not tested on Windows)
 J Ashworth May 2019
 Work in progress: fork/expand/improve as appropriate
 '''
@@ -49,9 +50,10 @@ class Cyto:
 			self.clusters['cl_%i' %clrank] = ind
 
 	def fit_FSC_filter(self,frc=0.3,nse=12,hch='FSC-H',ach='FSC-A'):
-		msg('fitting FSC H/A...')
 		# problem: clumps and detritus register anomalously high FSC A/H ratios
 		# sometimes, this is present mostly in high H events (but not always)
+		# one approach is to try a linear fit to the lower intensity proportion of the population
+		msg('fitting FSC H/A...')
 
 		# solution 1: fit a line to the lower FSC H(/A) data; exclude any high FSC H outside of this linear relationship
 		hmin = self.dat.data[hch].min()
@@ -123,7 +125,9 @@ class Cyto:
 		msg('plotting %s' %','.join(chs))
 		fg,ax = plt.subplots()
 		plt.subplots_adjust(left=0.2)
-#		ax.scatter(self.dat.data[chs[0]],self.dat.data[chs[1]],s=1,c='black',alpha=0.4)
+
+		if len(self.clusters) == 0:
+			ax.scatter(self.dat.data[chs[0]],self.dat.data[chs[1]],s=1,c='black',alpha=0.4)
 
 		cls = self.clusters.keys()
 #		cls = [
@@ -148,11 +152,8 @@ class Cyto:
 			ax.set_xlim(goodx.min(), goodx.max())
 			ax.set_ylim(goody.min(), goody.max())
 
-		if not xrng == []: 
- 			ax.set_xlim(xrng[0],xrng[1])
-
-		if not yrng == []: 
- 			ax.set_ylim(yrng[0],yrng[1])
+		if not xrng == []: ax.set_xlim(xrng[0],xrng[1])
+		if not yrng == []: ax.set_ylim(yrng[0],yrng[1])
 
 		ax.set_xlabel(chs[0])
 		ax.set_ylabel(chs[1])
@@ -183,20 +184,17 @@ class Cyto:
 		for i in range(len(chs)):
 			axs[i].hist(self.dat.data[chs[i]],bins=100,color='black')
 			axs[i].set_ylabel(chs[i],rotation=0,ha='right')
-#			axs[i].set_xscale('symlog')
 			axs[i].set_yticklabels([])
 			axs[i].set_xticklabels([])
 		fg.savefig('%s.all%s.png' %(self.prf,suff))
 	
 	def chs(self): return(self.dat.data.columns)
 
-if __name__ == "__main__":
+	## code above is importable in ipython, jupyter, etc ##
 
-	'''
-	'FSC-H', 'FSC-A', 'SSC-H', 'SSC-A', 'Violet SSC-H', 'Violet SSC-A',
-				 'mVenus FITC-H', 'mVenus FITC-A', 'PE-H', 'PE-A', 'Chorophyll PC5.5-H',
-								'Chorophyll PC5.5-A', 'FSC-Width'
-	'''
+	## code below runs if this script is called on command line e.g.:
+	## `./Cyto.py *fcs`
+if __name__ == "__main__":
 
 	plots2d = [
 #		(['FSC-A','SSC-A'],[0,1e7],[0,1.5e6]),
@@ -226,21 +224,23 @@ if __name__ == "__main__":
 	for f in fs:
 		c = Cyto(f)
 		if c.dat.data.shape[0] < min_events: continue
-		# plot 1-D histograms of all channels/data
+
+#		# plot 1-D histograms of all channels/data
 #		c.allch()
 
-#		# an attempt to filter out anomalously high FSC-A/FSC-H events using fit lines
+#		# apply a linear fit filter for anomalously high FSC-A/FSC-H events
 #		c.fit_FSC_filter()
 
 		cluster = True
 		if cluster:
-			# use cluster to find clusters in FSC-A/FSC-H space, under the assuption that one or more contains all of the anomalously high FSC-A/FSC-H ratios
+			# use a clustering class from sklearn.cluster (e.g. KMeans) to find clusters in FSC-A/FSC-H space,
+			# under the assumption that one or more contains anomalous or undesireable events
 			cl_chs = ['FSC-A','FSC-H']
 			clusterer = KMeans(4)
-			# DBSCAN: it works, but it very touchy w.r.t. params, highly variable results
+			# DBSCAN: it works, but it very touchy w.r.t. params (variable results)
 	#		clusterer = DBSCAN(eps=2e5,min_samples=500)
 			c.cluster(clusterer,cl_chs)
-#		for chs,xrng,yrng in plots2d: c.plot2ch(chs,xrng,yrng)
+		for chs,xrng,yrng in plots2d: c.plot2ch(chs,xrng,yrng)
 		for ch,xrng in hists: c.plothist(ch,xrng,plot=True)
 		cytos[f] = c
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
 		('median_mVenus FITC-A','median_Chorophyll PC5.5-A'),
 	]
 	
-	namecols = { 
+	namecols = {
 #		'A' : 'red',
 #		'B' : 'red',
 #		'C' : 'red',
