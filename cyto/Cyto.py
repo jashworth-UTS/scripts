@@ -12,10 +12,13 @@ import FlowCytometryTools
 from FlowCytometryTools import FCMeasurement
 import matplotlib
 from matplotlib import pyplot as plt
+cmap = matplotlib.cm.get_cmap('tab10')
+ncols = 10
+def cmap_col(i): return(cmap(float(i % ncols)/ncols))
 from sys import stderr,argv
 import scipy.stats
 import numpy
-from sklearn.cluster import KMeans,DBSCAN
+from sklearn.cluster import *
 import re
 
 def msg(msg): stderr.write('%s\n' %msg)
@@ -28,9 +31,14 @@ class Cyto:
 		self.clusters = {}
 		self.stats = {}
 
-	def cluster(self,clusterer,chs=[]):
-		if chs == []: chs = self.dat.data.columns
+	def cluster(self,clusterer,chdefs=[]):
+		chs = []
+		for ch,scale in chdefs: chs.append(ch)
 		cldat = self.dat.data[chs]
+		for ch,scale in chdefs: 
+			if scale == 'log': 
+				# clusterers can choke on 'nan' values
+				cldat[ch] = [numpy.log10(d) if d>0 else 0 for d in cldat[ch]]
 		cls = clusterer.fit(cldat)
 
 		# re-rank the clusters according to median values in first clustering dimension
@@ -98,23 +106,37 @@ class Cyto:
 		msg('%i events flagged as outliers by FSC H/A filter' %list(outliers).count(True))
 
 	def plothist(self,ch,xrng,logdata=True,plot=True):
-		dd = self.dat.data[ch]
-		rawmed = numpy.median(dd)
-		statkey = 'median_%s' %ch
-		self.stats[statkey] = rawmed
 		if plot:
 			fg,ax = plt.subplots()
 			plt.subplots_adjust(left=0.2)
-			med = rawmed
-			if logdata:
-				dd = [numpy.log10(d) for d in dd if d>0]
-				med = numpy.log10(med)
-			nn,bins,patches = ax.hist(dd,bins=100,color='black')
-			maxn = numpy.max(nn)
 
+		clcnt = 0
+		maxn = 0
+		nall = self.dat.data[ch].shape[0]
+		for cl in sorted(self.clusters):
+			dd = self.dat.data[ch][self.clusters[cl]]
+			cl_col=cmap_col(clcnt)
+			clcnt += 1
+			rawmed = numpy.median(dd)
+			statkey = 'median_%s_%s' %(ch,cl)
+			self.stats[statkey] = rawmed
+
+			if plot:
+				med = rawmed
+				if logdata:
+					dd = [numpy.log10(d) for d in dd if d>0]
+					med = numpy.log10(med)
+				nn,bins,patches = ax.hist(dd,bins=100,color=cl_col,alpha=0.3)
+				n = numpy.sum(nn)
+				frac = float(n)/nall
+				nnmax = numpy.max(nn)
+				maxn = numpy.max((maxn,nnmax))
+
+				ax.plot([med,med],[0,1e4],color=cl_col,label='%0.2g (%0.2g)' %(rawmed,frac))
+
+		if plot:
 			ax.set_ylim(0,maxn)
-			ax.plot([med,med],[0,1e4],color='red')
-			ax.text(med*0.9,maxn*0.9,'%g' %rawmed,ha='right',color='red')
+			ax.legend()
 			ax.set_xlabel(ch)
 			ax.set_ylabel('counts')
 			if not xrng == []:
@@ -127,22 +149,19 @@ class Cyto:
 		plt.subplots_adjust(left=0.2)
 
 		if len(self.clusters) == 0:
-			ax.scatter(self.dat.data[chs[0]],self.dat.data[chs[1]],s=1,c='black',alpha=0.4)
+			ax.scatter(self.dat.data[chs[0]],self.dat.data[chs[1]],s=1,c='black',alpha=0.3)
 
 		cls = self.clusters.keys()
 #		cls = [
 #			('FSC_lf_outliers','red'),
 #		]
-		cmap = matplotlib.cm.get_cmap('tab10')
-		ncols = 10
-		def cmap_col(i): return(cmap(float(i % ncols)/ncols))
 			
 		clcnt = 0
 		for cl in sorted(cls):
 			if not cl in self.clusters: continue
 			clx = self.dat.data[chs[0]][self.clusters[cl]]
 			cly = self.dat.data[chs[1]][self.clusters[cl]]
-			ax.scatter(clx,cly,s=1,c=cmap_col(clcnt),alpha=0.5)
+			ax.scatter(clx,cly,s=1,c=cmap_col(clcnt),alpha=0.3)
 			clcnt += 1
 
 		exclude_for_ranges = 'FSC_lf_outliers'
@@ -159,7 +178,8 @@ class Cyto:
 		ax.set_ylabel(chs[1])
 
 #		linaxes = ['FSC','SSC','FITC','phyll']
-		linaxes = ['FSC','SSC']
+#		linaxes = ['FSC','SSC']
+		linaxes = []
 		scaling = 'symlog'
 		for rgx in linaxes:
 			if rgx in chs[0]:
@@ -204,18 +224,18 @@ if __name__ == "__main__":
 #		(['SSC-A','SSC-H'],[],[]),
 		(['FSC-A','FSC-H'],[],[]),
 #		(['FSC-H','SSC-H'],[],[]),
-#		(['mVenus FITC-A','Chorophyll PC5.5-A'],[1e2,1e6],[1e2,1e6]),
+		(['mVenus FITC-A','Chorophyll PC5.5-A'],[1e2,1e6],[1e2,1e6]),
 #		(['mVenus FITC-H','Chorophyll PC5.5-H'],[1e2,1e6],[1e2,1e6]),
-		(['mVenus FITC-A','Chorophyll PC5.5-A'],[],[]),
+#		(['mVenus FITC-A','Chorophyll PC5.5-A'],[],[]),
 #		(['mVenus FITC-H','Chorophyll PC5.5-H'],[],[]),
 #		(['mVenus FITC-A','PE-A'],[1e2,1e7],[]),
 	]
 
 	hists = [
-#		('mVenus FITC-A',[1e2,1e6]),
-#		('Chorophyll PC5.5-A',[1e2,1e6]),
-		('mVenus FITC-A',[]),
-		('Chorophyll PC5.5-A',[]),
+		('mVenus FITC-A',[1e2,1e6]),
+		('Chorophyll PC5.5-A',[1e2,1e6]),
+#		('mVenus FITC-A',[]),
+#		('Chorophyll PC5.5-A',[]),
 	]
 
 	fs = argv[1:]
@@ -223,6 +243,8 @@ if __name__ == "__main__":
 	min_events = 100
 	for f in fs:
 		c = Cyto(f)
+		print(c.chs())
+
 		if c.dat.data.shape[0] < min_events: continue
 
 #		# plot 1-D histograms of all channels/data
@@ -235,10 +257,29 @@ if __name__ == "__main__":
 		if cluster:
 			# use a clustering class from sklearn.cluster (e.g. KMeans) to find clusters in FSC-A/FSC-H space,
 			# under the assumption that one or more contains anomalous or undesireable events
-			cl_chs = ['FSC-A','FSC-H']
-			clusterer = KMeans(4)
-			# DBSCAN: it works, but it very touchy w.r.t. params (variable results)
-	#		clusterer = DBSCAN(eps=2e5,min_samples=500)
+			cl_chs = [
+				('mVenus FITC-A','log'),
+				('mVenus FITC-H','log'),
+				('Chorophyll PC5.5-A','log'),
+				('Chorophyll PC5.5-H','log'),
+				('SSC-A','log'),
+				('SSC-H','log'),
+				('FSC-A','log'),
+#				('FSC-H','log'),
+				('Violet SSC-A','log'),
+				('PE-A','log'),
+#				('Time','linear'),
+			]
+			nclust = 5
+			clusterer = KMeans(n_clusters=nclust) # simple but doesn't really find "patterns" as much as "regions"
+#			clusterer = DBSCAN(eps=0.5,min_samples=100) # touchy
+#			clusterer = AffinityPropagation() # too slow
+#			clusterer = AgglomerativeClustering(n_clusters=nclust) # slow-ish
+#			clusterer = Birch(n_clusters=nclust)
+#			clusterer = MiniBatchKMeans(n_clusters=nclust)
+#			clusterer = MeanShift() # too slow
+#			clusterer = SpectralClustering(n_clusters=nclust) # too slow
+
 			c.cluster(clusterer,cl_chs)
 		for chs,xrng,yrng in plots2d: c.plot2ch(chs,xrng,yrng)
 		for ch,xrng in hists: c.plothist(ch,xrng,plot=True)
@@ -261,7 +302,8 @@ if __name__ == "__main__":
 		print('\t'.join([row[0]] + ['%g' %v for v in row[1:]]))
 
 	statplots2d = [
-		('median_mVenus FITC-A','median_Chorophyll PC5.5-A'),
+#		('median_mVenus FITC-A','median_Chorophyll PC5.5-A',[1e2,1e6],[1e2,1e6]),
+		('median_mVenus FITC-A','median_Chorophyll PC5.5-A',[],[]),
 	]
 	
 	namecols = {
@@ -273,17 +315,21 @@ if __name__ == "__main__":
 #		'F' : 'blue',
 #		'G' : 'blue',
 #		'H' : 'blue',
-		'A' : 'red',
-		'B' : 'green',
-		'C' : 'blue',
-		'D' : 'gray',
-		'E' : 'purple',
-		'F' : 'orange',
-		'G' : 'cyan',
-		'H' : 'magenta',
+#		'A' : 'red',
+#		'B' : 'green',
+#		'C' : 'blue',
+#		'D' : 'gray',
+#		'E' : 'purple',
+#		'F' : 'orange',
+#		'G' : 'cyan',
+#		'H' : 'magenta',
+		'A[123456]' : 'red',
+		'B[123456]' : 'blue',
+		'C[123456]' : 'green',
+		'D[123456]' : 'orange',
 	}
 
-	for xch,ych in statplots2d:
+	for xch,ych,xrng,yrng in statplots2d:
 		lab = []
 		cols = []
 		xv = []
@@ -294,8 +340,8 @@ if __name__ == "__main__":
 			lb = re.sub('\.fcs.*','',row[0])
 			lb = lb.split('-')[-1]
 			col = 'black'
-			for nm in namecols:
-				if nm in lb: col = namecols[nm]
+			for rgx in namecols:
+				if re.search(rgx,lb): col = namecols[rgx]
 			cols.append(col)
 			lab.append(lb)
 			xv.append(row[xi])
@@ -310,4 +356,9 @@ if __name__ == "__main__":
 			ax.text(xv[i],yv[i],lab[i],ha='right',color=cols[i])
 		ax.set_xlabel(xch)
 		ax.set_ylabel(ych)
+		ax.set_xscale('log')
+		ax.set_yscale('log')
+		if not xrng == []: ax.set_xlim(xrng[0],xrng[1])
+		if not yrng == []: ax.set_ylim(yrng[0],yrng[1])
+
 		fg.savefig('statplot.png')
