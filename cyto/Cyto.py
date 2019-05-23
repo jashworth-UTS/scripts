@@ -255,8 +255,8 @@ if __name__ == "__main__":
 
 		cluster = True
 		if cluster:
-			# use a clustering class from sklearn.cluster (e.g. KMeans) to find clusters in FSC-A/FSC-H space,
-			# under the assumption that one or more contains anomalous or undesireable events
+			# use a clustering class from sklearn.cluster (e.g. KMeans) to find clusters in [custom] multi-dimensional space
+			# under the assumption that one or more contains distinct, anomalous or undesireable events
 			cl_chs = [
 				('mVenus FITC-A','log'),
 				('mVenus FITC-H','log'),
