@@ -113,6 +113,12 @@ class Cyto:
 		clcnt = 0
 		maxn = 0
 		nall = self.dat.data[ch].shape[0]
+
+		dall = self.dat.data[ch]
+		med_all = numpy.median(dall)
+		statkey = 'median_%s' %(ch)
+		self.stats[statkey] = med_all
+
 		for cl in sorted(self.clusters):
 			dd = self.dat.data[ch][self.clusters[cl]]
 			cl_col=cmap_col(clcnt)
@@ -315,18 +321,18 @@ if __name__ == "__main__":
 #		'F' : 'blue',
 #		'G' : 'blue',
 #		'H' : 'blue',
-#		'A' : 'red',
-#		'B' : 'green',
-#		'C' : 'blue',
-#		'D' : 'gray',
-#		'E' : 'purple',
-#		'F' : 'orange',
-#		'G' : 'cyan',
-#		'H' : 'magenta',
-		'A[123456]' : 'red',
-		'B[123456]' : 'blue',
-		'C[123456]' : 'green',
-		'D[123456]' : 'orange',
+		'A' : 'red',
+		'B' : 'green',
+		'C' : 'blue',
+		'D' : 'gray',
+		'E' : 'purple',
+		'F' : 'orange',
+		'G' : 'cyan',
+		'H' : 'magenta',
+#		'A[123456]' : 'red',
+#		'B[123456]' : 'blue',
+#		'C[123456]' : 'green',
+#		'D[123456]' : 'orange',
 	}
 
 	for xch,ych,xrng,yrng in statplots2d:
